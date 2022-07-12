@@ -30,6 +30,8 @@ public:
     // Left time of projectile's life
     double lifeTime;
 
+    bool destroyed = false;
+
     bool intersectUnit(const Unit& unit, const Constants& constants) const;
     bool intersectCircle(const Vec2& center, const double radius) const;
 
@@ -43,6 +45,8 @@ public:
 
     // Get string representation of Projectile
     std::string toString() const;
+
+    bool hasHit(const model::Unit& unit, const model::Vec2& unit_velocity) const;
 };
 
 }

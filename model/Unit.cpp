@@ -162,6 +162,7 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
     }
 
     void Unit::calcSpeedCircle(const model::Constants& constants) {
+        unit_radius = constants.unitRadius;
         max_forward_speed = constants.maxUnitForwardSpeed;
         max_backward_speed = constants.maxUnitBackwardSpeed;
         if (weapon) {

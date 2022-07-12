@@ -51,7 +51,7 @@ public:
     // Number of shield potions in inventory
     int shieldPotions;
 
-    int radius = 0;
+    int unit_radius = 0;
 
     double speed_radius = 0;
     model::Vec2 speed_center;

@@ -8,10 +8,14 @@
 #include "model/Order.hpp"
 
 class MyStrategy {
+private:
+    static model::Constants* constants_;
 public:
     MyStrategy(const model::Constants& constants);
     model::Order getOrder(model::Game& game, DebugInterface* debugInterface);
     model::Vec2 dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit);
+
+    static model::Constants* getConstants();
 
     void debugUpdate(DebugInterface& debugInterface);
     void finish();
