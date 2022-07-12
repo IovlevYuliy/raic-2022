@@ -26,6 +26,8 @@ public:
 
     // Get string representation of Item
     virtual std::string toString() const = 0;
+
+    virtual int getTag() const = 0;
 };
 
 // Weapon
@@ -48,6 +50,8 @@ public:
     std::string toString() const;
 
     bool operator ==(const Weapon& other) const;
+
+    int getTag() const;
 };
 
 // Shield potions
@@ -70,6 +74,8 @@ public:
     std::string toString() const;
 
     bool operator ==(const ShieldPotions& other) const;
+
+    int getTag() const;
 };
 
 // Ammo
@@ -94,6 +100,8 @@ public:
     std::string toString() const;
 
     bool operator ==(const Ammo& other) const;
+
+    int getTag() const;
 };
 
 }

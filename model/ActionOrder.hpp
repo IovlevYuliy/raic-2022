@@ -61,7 +61,6 @@ class ActionOrder::UseShieldPotion : public ActionOrder {
 public:
     static const int TAG = 1;
 
-
     UseShieldPotion();
 
     // Read UseShieldPotion from input stream

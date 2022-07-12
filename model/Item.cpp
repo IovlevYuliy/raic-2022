@@ -31,6 +31,10 @@ bool Item::Weapon::operator ==(const Item::Weapon& other) const {
     return typeIndex == other.typeIndex;
 }
 
+int Item::Weapon::getTag() const {
+    return TAG;
+}
+
 Item::ShieldPotions::ShieldPotions(int amount) : amount(amount) { }
 
 // Read ShieldPotions from input stream
@@ -57,6 +61,10 @@ std::string Item::ShieldPotions::toString() const {
 
 bool Item::ShieldPotions::operator ==(const Item::ShieldPotions& other) const {
     return amount == other.amount;
+}
+
+int Item::ShieldPotions::getTag() const {
+    return TAG;
 }
 
 Item::Ammo::Ammo(int weaponTypeIndex, int amount) : weaponTypeIndex(weaponTypeIndex), amount(amount) { }
@@ -90,6 +98,10 @@ std::string Item::Ammo::toString() const {
 
 bool Item::Ammo::operator ==(const Item::Ammo& other) const {
     return weaponTypeIndex == other.weaponTypeIndex && amount == other.amount;
+}
+
+int Item::Ammo::getTag() const {
+    return TAG;
 }
 
 // Read Item from input stream
