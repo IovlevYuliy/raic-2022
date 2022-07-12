@@ -90,19 +90,28 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         }
 
         auto healing_order = healing(myUnit);
+        auto loot_order = looting(game.loot, myUnit, game.zone);
+
         if (healing_order) {
+            if (loot_order) {
+                healing_order->targetDirection = loot_order->targetDirection;
+                healing_order->targetVelocity = loot_order->targetVelocity;
+            }
             actions.insert({myUnit.id, *healing_order});
             continue;
         }
 
-        auto loot_order = looting(game.loot, myUnit, game.zone);
         if (loot_order) {
             actions.insert({myUnit.id, *loot_order});
             continue;
         }
 
-        if (threats.empty()) {
+        if (!nearest_enemy && threats.empty()) {
             direction = (game.zone.nextCenter - myUnit.position) * constants.zoneSpeed;
+        }
+
+        if (nearest_enemy) {
+            direction = (nearest_enemy->position - myUnit.position).norm().mul(constants.maxUnitForwardSpeed / 2);
         }
 
         model::UnitOrder order(
