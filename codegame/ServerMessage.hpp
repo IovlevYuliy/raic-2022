@@ -22,113 +22,97 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace codegame {
-
-// Message sent from server
-class ServerMessage {
-public:
     // Update constants
-    class UpdateConstants;
+    class UpdateConstants {
+    public:
+        // New constants
+        model::Constants constants;
+
+        UpdateConstants(model::Constants constants);
+
+        // Read UpdateConstants from input stream
+        static UpdateConstants readFrom(InputStream& stream);
+
+        // Write UpdateConstants to output stream
+        void writeTo(OutputStream& stream) const;
+
+        // Get string representation of UpdateConstants
+        std::string toString() const;
+    };
+
     // Get order for next tick
-    class GetOrder;
+    class GetOrder {
+    public:
+        // Player's view
+        model::Game playerView;
+        // Whether app is running with debug interface available
+        bool debugAvailable;
+
+        GetOrder(model::Game playerView, bool debugAvailable);
+
+        // Read GetOrder from input stream
+        static GetOrder readFrom(InputStream& stream);
+
+        // Write GetOrder to output stream
+        void writeTo(OutputStream& stream) const;
+
+        // Get string representation of GetOrder
+        std::string toString() const;
+    };
+
     // Signifies end of the game
-    class Finish;
+    class Finish {
+    public:
+
+        Finish();
+
+        // Read Finish from input stream
+        static Finish readFrom(InputStream& stream);
+
+        // Write Finish to output stream
+        void writeTo(OutputStream& stream) const;
+
+        // Get string representation of Finish
+        std::string toString() const;
+
+        bool operator ==(const Finish& other) const;
+    };
+
     // Debug update
-    class DebugUpdate;
+    class DebugUpdate {
+    public:
+        // Displayed tick
+        int displayedTick;
+
+        DebugUpdate(int displayedTick);
+
+        // Read DebugUpdate from input stream
+        static DebugUpdate readFrom(InputStream& stream);
+
+        // Write DebugUpdate to output stream
+        void writeTo(OutputStream& stream) const;
+
+        // Get string representation of DebugUpdate
+        std::string toString() const;
+
+        bool operator ==(const DebugUpdate& other) const;
+    };
+
+    // Message sent from server
+    typedef std::variant<UpdateConstants, GetOrder, Finish, DebugUpdate> ServerMessage;
 
     // Read ServerMessage from input stream
-    static std::shared_ptr<ServerMessage> readFrom(InputStream& stream);
+    ServerMessage readServerMessage(InputStream& stream);
 
     // Write ServerMessage to output stream
-    virtual void writeTo(OutputStream& stream) const = 0;
+    void writeServerMessage(const ServerMessage& value, OutputStream& stream);
 
     // Get string representation of ServerMessage
-    virtual std::string toString() const = 0;
-};
-
-// Update constants
-class ServerMessage::UpdateConstants : public ServerMessage {
-public:
-    static const int TAG = 0;
-
-    // New constants
-    model::Constants constants;
-
-    UpdateConstants(model::Constants constants);
-
-    // Read UpdateConstants from input stream
-    static UpdateConstants readFrom(InputStream& stream);
-
-    // Write UpdateConstants to output stream
-    void writeTo(OutputStream& stream) const;
-
-    // Get string representation of UpdateConstants
-    std::string toString() const;
-};
-
-// Get order for next tick
-class ServerMessage::GetOrder : public ServerMessage {
-public:
-    static const int TAG = 1;
-
-    // Player's view
-    model::Game playerView;
-    // Whether app is running with debug interface available
-    bool debugAvailable;
-
-    GetOrder(model::Game playerView, bool debugAvailable);
-
-    // Read GetOrder from input stream
-    static GetOrder readFrom(InputStream& stream);
-
-    // Write GetOrder to output stream
-    void writeTo(OutputStream& stream) const;
-
-    // Get string representation of GetOrder
-    std::string toString() const;
-};
-
-// Signifies end of the game
-class ServerMessage::Finish : public ServerMessage {
-public:
-    static const int TAG = 2;
-
-
-    Finish();
-
-    // Read Finish from input stream
-    static Finish readFrom(InputStream& stream);
-
-    // Write Finish to output stream
-    void writeTo(OutputStream& stream) const;
-
-    // Get string representation of Finish
-    std::string toString() const;
-
-    bool operator ==(const Finish& other) const;
-};
-
-// Debug update
-class ServerMessage::DebugUpdate : public ServerMessage {
-public:
-    static const int TAG = 3;
-
-
-    DebugUpdate();
-
-    // Read DebugUpdate from input stream
-    static DebugUpdate readFrom(InputStream& stream);
-
-    // Write DebugUpdate to output stream
-    void writeTo(OutputStream& stream) const;
-
-    // Get string representation of DebugUpdate
-    std::string toString() const;
-
-    bool operator ==(const DebugUpdate& other) const;
-};
+    std::string serverMessageToString(const ServerMessage& value);
 
 }
 

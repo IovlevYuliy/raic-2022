@@ -48,7 +48,7 @@ public:
         return x * vec.y - y * vec.x;
     }
 
-    void rotate(const double angle);
+    Vec2& rotate(const double angle);
 
     Vec2& operator +=(const Vec2& vec) {
         x += vec.x;

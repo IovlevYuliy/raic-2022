@@ -1,5 +1,6 @@
 #include "MyStrategy.hpp"
 #include <exception>
+#include <variant>
 
 model::Constants* MyStrategy::constants_;
 
@@ -34,12 +35,12 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         }
 
         std::optional<model::Unit> nearest_enemy;
-        double min_dist = 1e9;
+        double min_dist_to_enemy = 1e9;
         for (auto &enemy : enemies) {
             auto distToEnemy = enemy.position.distToSquared(myUnit.position);
-            if(distToEnemy < min_dist) {
+            if(distToEnemy < min_dist_to_enemy) {
                 nearest_enemy = enemy;
-                min_dist = distToEnemy;
+                min_dist_to_enemy = distToEnemy;
             }
         }
 
@@ -52,40 +53,51 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
             }
         }
 
-        auto direction = dodging(threats, myUnit);
+        // auto direction = dodging(threats, myUnit);
         bool has_ammo = myUnit.weapon && myUnit.ammo[*myUnit.weapon] > 0;
 
-        if (nearest_enemy && has_ammo && myUnit.health > 0.5 * constants.unitHealth && min_dist < constants.viewDistance * constants.viewDistance / 4) {
+        if (nearest_enemy && has_ammo && (myUnit.health > 0.2 * constants.unitHealth || nearest_enemy->health < 0.5 * constants.unitHealth) && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 4) {
             bool shooting = false;
 
+            model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, game.myId, myUnit.position + myUnit.direction * constants.unitRadius, myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed, constants.weapons[*myUnit.weapon].projectileLifeTime);
+            double dist_to_enemy = bullet.position.distTo(nearest_enemy->position) - constants.unitRadius;
             if (fabs(1.0 - myUnit.aim) < 1e-6) {
-                model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, game.myId, myUnit.position + myUnit.direction * constants.unitRadius, myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed, constants.weapons[*myUnit.weapon].projectileLifeTime);
 
-                double min_dist = 1e9;
+                double min_dist_to_obstacle = 1e9;
                 std::optional<model::Obstacle> nearest_obst;
 
                 for (auto& obstacle: constants.obstacles) {
                     if (obstacle.canShootThrough) continue;
                     if (!bullet.intersectCircle(obstacle.position, obstacle.radius)) continue;
                     double dist_to_obst = obstacle.position.distTo(bullet.position) - obstacle.radius;
-                    if (dist_to_obst < min_dist) {
+                    if (dist_to_obst < min_dist_to_obstacle) {
                         nearest_obst = obstacle;
-                        min_dist = dist_to_obst;
+                        min_dist_to_obstacle = dist_to_obst;
                     }
                 }
 
-                double dist_to_enemy = bullet.position.distTo(nearest_enemy->position) - constants.unitRadius;
-                shooting = bullet.intersectUnit(*nearest_enemy, constants) && (!nearest_obst || dist_to_enemy <=  min_dist);
+                shooting = (!nearest_obst || dist_to_enemy <= min_dist_to_obstacle);
             }
 
-            auto aim = std::make_shared<model::ActionOrder::Aim>(shooting);
-            auto action = std::make_optional(aim);
+            double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
+
+            model::Vec2 direction = (nearest_enemy->position - myUnit.position).norm();
+            if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 9) {
+                direction.rotate(90);
+            }
             model::UnitOrder order(
-                direction,
-                nearest_enemy->position - myUnit.position,
-                action
+                direction.mul(constants.maxUnitForwardSpeed),
+                (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
+                model::Aim(shooting)
             );
+
+            if (debugInterface && shooting) {
+                debugInterface->addPolyLine({myUnit.position, (nearest_enemy->position + nearest_enemy->velocity * 0.5) }, 0.1, debugging::Color(0, 0, 1, 1));
+            }
+
             actions.insert({myUnit.id, order});
+
+            // cerr << game.currentTick << ' ' << std::noboolalpha << shooting << endl;
             continue;
         }
 
@@ -106,16 +118,17 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
             continue;
         }
 
-        if (!nearest_enemy && threats.empty()) {
-            direction = (game.zone.nextCenter - myUnit.position) * constants.zoneSpeed;
-        }
-
         if (nearest_enemy) {
-            direction = (nearest_enemy->position - myUnit.position).norm().mul(constants.maxUnitForwardSpeed / 2);
+            model::UnitOrder order(
+                (nearest_enemy->position - myUnit.position).norm().mul(constants.maxUnitForwardSpeed / 2),
+                (nearest_enemy->position - myUnit.position),
+                std::nullopt);
+            actions.insert({myUnit.id, order});
+            continue;
         }
 
         model::UnitOrder order(
-            direction,
+            (game.zone.nextCenter - myUnit.position) * constants.zoneSpeed,
             {-myUnit.direction.y, myUnit.direction.x},
             std::nullopt);
         actions.insert({myUnit.id, order});
@@ -130,7 +143,7 @@ model::Vec2 MyStrategy::dodging(std::vector<model::Projectile>& bullets, const m
     }
 
     auto res = simulator.Simulate(myUnit, bullets, 1);
-    std::cerr << res.second << std::endl;
+    // std::cerr << res.second << std::endl;
     return res.first;
 }
 
@@ -139,7 +152,7 @@ std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) c
         return model::UnitOrder(
             myUnit.direction * constants.maxUnitForwardSpeed,
             {-myUnit.position.x, -myUnit.position.y},
-            std::make_shared<model::ActionOrder::UseShieldPotion>()
+            model::UseShieldPotion()
         );
     }
 
@@ -154,39 +167,37 @@ std::optional<model::UnitOrder> MyStrategy::looting(std::vector<model::Loot>& lo
     double min_dist = 1e9;
     std::optional<model::Loot> nearest_loot;
     for (auto& loot: loots) {
-        if (!loot.item) {
-            continue;
-        }
-
         double dist_to_loot = loot.position.distToSquared(myUnit.position);
         if (dist_to_loot > min_dist) {
             continue;
         }
 
-        if (loot.item->getTag() == model::Item::ShieldPotions::TAG && myUnit.shieldPotions < constants.maxShieldPotionsInInventory / 2) {
+        if (std::holds_alternative<model::ShieldPotions>(loot.item) && myUnit.shieldPotions < constants.maxShieldPotionsInInventory / 2) {
             nearest_loot = loot;
             min_dist = dist_to_loot;
         }
 
-        if (loot.item->getTag() == model::Item::Ammo::TAG && myUnit.health > constants.unitHealth * 0.7) {
-            auto ammo = std::dynamic_pointer_cast<model::Item::Ammo>(loot.item);
-            if (constants.weapons[ammo->weaponTypeIndex].name == "Magic wand") {
+        if (std::holds_alternative<model::Ammo>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
+            auto ammo = std::get<model::Ammo>(loot.item);
+            if (constants.weapons[ammo.weaponTypeIndex].name == "Magic wand") {
                 continue;
             }
 
-            if (myUnit.ammo[ammo->weaponTypeIndex] < 0.9 * constants.weapons[ammo->weaponTypeIndex].maxInventoryAmmo) {
+            if (myUnit.ammo[ammo.weaponTypeIndex] < 0.9 * constants.weapons[ammo.weaponTypeIndex].maxInventoryAmmo) {
                 nearest_loot = loot;
                 min_dist = dist_to_loot;
             }
         }
 
-        if (loot.item->getTag() == model::Item::Weapon::TAG && myUnit.health > constants.unitHealth * 0.7) {
-            auto weapon = std::dynamic_pointer_cast<model::Item::Weapon>(loot.item);
-            if (constants.weapons[weapon->typeIndex].name == "Magic wand") {
+        if (std::holds_alternative<model::Weapon>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
+            auto weapon = std::get<model::Weapon>(loot.item);
+            if (constants.weapons[weapon.typeIndex].name == "Magic wand") {
                 continue;
             }
 
-            if (!myUnit.weapon || (myUnit.ammo[weapon->typeIndex] > 0 && constants.weapons[*myUnit.weapon].name == "Magic wand") || (constants.weapons[weapon->typeIndex].name == "Bow" && myUnit.ammo[weapon->typeIndex] > 0 && constants.weapons[*myUnit.weapon].name != "Bow")) {
+            if (!myUnit.weapon ||
+                (myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name == "Magic wand") ||
+                (constants.weapons[weapon.typeIndex].name == "Bow" && myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name != "Bow")) {
                 nearest_loot = loot;
                 min_dist = dist_to_loot;
             }
@@ -211,10 +222,10 @@ std::optional<model::UnitOrder> MyStrategy::looting(std::vector<model::Loot>& lo
     return model::UnitOrder(
         {0, 0},
         dir,
-        std::make_shared<model::ActionOrder::Pickup>(((*nearest_loot).id))
+        model::Pickup(nearest_loot->id)
     );
 }
 
-void MyStrategy::debugUpdate(DebugInterface& dbgInterface) {}
+void MyStrategy::debugUpdate(int displayedTick, DebugInterface& dbgInterface) {}
 
 void MyStrategy::finish() {}

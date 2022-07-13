@@ -27,7 +27,7 @@ public:
 
     static model::Constants* getConstants();
 
-    void debugUpdate(DebugInterface& debugInterface);
+    void debugUpdate(int displayedTick, DebugInterface& debugInterface);
     void finish();
 
     Simulator simulator;

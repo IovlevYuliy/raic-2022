@@ -50,11 +50,13 @@ namespace model {
         return *this;
     }
 
-    void Vec2::rotate(const double angle) {
+    Vec2& Vec2::rotate(const double angle) {
         double new_x = x * cos(angle * M_PI / 180.0) - y * sin(angle * M_PI / 180.0);
         double new_y = x * sin(angle * M_PI / 180.0) + y * cos(angle * M_PI / 180.0);
         x = new_x;
         y = new_y;
+
+        return *this;
     }
 
     Vec2& Vec2::mul(const double& scalar) {

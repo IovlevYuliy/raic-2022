@@ -178,6 +178,13 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
         debugInterface->addRing(speed_center, speed_radius, 0.1, debugging::Color(0, 0, 0, 0.5));
         debugInterface->addPolyLine({position, position + velocity}, 0.1, debugging::Color(0, 1, 0, 1));
         debugInterface->addPolyLine({position, position + direction}, 0.1, debugging::Color(1, 1, 0, 1));
+
+        std::stringstream ss;
+        ss.precision(3);
+        ss << aim;
+        std::string text = ss.str() + " / " +  std::to_string(nextShotTick);
+        debugInterface->addPlacedText(position, text, {0, -1}, 0.5, debugging::Color(0, 0, 0, 0.8));
+
     };
 
     model::Vec2 Unit::getVelocity(const model::Vec2& dir) const {
