@@ -1,4 +1,6 @@
 #include "Unit.hpp"
+#include <iostream>
+#include <algorithm>
 
 namespace model {
 
@@ -188,10 +190,11 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
     };
 
     model::Vec2 Unit::getVelocity(const model::Vec2& dir) const {
-        double sin_a = direction.cross(dir);
+        double sin_a = std::clamp(direction.cross(dir), -1.0, 1.0);
         double d = (max_forward_speed - max_backward_speed) / 2;
         double sin_b = d * sin_a / speed_radius;
         double angle = M_PI - asin(sin_a) - asin(sin_b);
+
         double len = sqrt(d * d + speed_radius * speed_radius - 2 * d * speed_radius * cos(angle));
         return dir * len;
     }

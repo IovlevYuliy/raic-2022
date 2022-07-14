@@ -75,9 +75,9 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         return ray.intersectsCircle(center, radius);
     }
 
-    bool Projectile::hasHit(const model::Unit& unit, const model::Vec2& unit_velocity) const {
+    bool Projectile::hasHit(const model::Unit& unit) const {
         auto c0 = position - unit.position;
-        auto v = velocity - unit_velocity;
+        auto v = velocity - unit.velocity;
         double a = v.x * v.x + v.y * v.y;
         double b = 2 * c0.x * v.x + 2 * c0.y * v.y;
         double c = c0.x * c0.x + c0.y * c0.y - unit.unit_radius * unit.unit_radius;
@@ -87,9 +87,9 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
             return false;
         }
 
-        double t = -b + sqrt(d) / 2.0 / a;
+        double t = (-b + sqrt(d)) / 2.0 / a;
 
-        if (t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
+        if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
             return false;
         }
 

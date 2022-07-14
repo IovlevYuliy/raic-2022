@@ -17,6 +17,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
     std::unordered_map<int, model::UnitOrder> actions;
     std::vector<model::Unit> enemies;
+    std::vector<model::Unit> my_units;
     std::vector<model::Projectile> threats;
     for (auto &unit : game.units) {
         if (unit.playerId != game.myId) {
@@ -28,6 +29,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     {
         if (myUnit.playerId != game.myId)
             continue;
+
         myUnit.calcSpeedCircle(constants);
 
         if (debugInterface) {
@@ -53,15 +55,25 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
             }
         }
 
-        // auto direction = dodging(threats, myUnit);
+        // simulateMovement(myUnit, threats);
+
+        auto dodge_dir = dodging(threats, myUnit);
+
+        if (dodge_dir.has_value() && debugInterface) {
+            debugInterface->addPolyLine({myUnit.position, (myUnit.position + *dodge_dir) }, 0.1, debugging::Color(1, 0.5, 0, 1));
+        }
+
         bool has_ammo = myUnit.weapon && myUnit.ammo[*myUnit.weapon] > 0;
 
         if (nearest_enemy && has_ammo && (myUnit.health > 0.2 * constants.unitHealth || nearest_enemy->health < 0.5 * constants.unitHealth) && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 4) {
             bool shooting = false;
+            double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
             model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, game.myId, myUnit.position + myUnit.direction * constants.unitRadius, myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed, constants.weapons[*myUnit.weapon].projectileLifeTime);
             double dist_to_enemy = bullet.position.distTo(nearest_enemy->position) - constants.unitRadius;
-            if (fabs(1.0 - myUnit.aim) < 1e-6) {
+            bool is_archer = nearest_enemy->weapon && constants.weapons[*nearest_enemy->weapon].name == "Bow";
+            double dist_coef = is_archer ? 4 : 9;
+            if (fabs(1.0 - myUnit.aim) <= aim_delta) {
 
                 double min_dist_to_obstacle = 1e9;
                 std::optional<model::Obstacle> nearest_obst;
@@ -81,12 +93,19 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
             double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
 
-            model::Vec2 direction = (nearest_enemy->position - myUnit.position).norm();
-            if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 9) {
-                direction.rotate(90);
+            model::Vec2 move;
+            if (dodge_dir.has_value()) {
+                move = *dodge_dir;
+            } else {
+                move = (nearest_enemy->position - myUnit.position).norm();
+                if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / dist_coef) {
+                    move.rotate(90).mul(constants.maxUnitForwardSpeed / 2);
+                } else {
+                    move.mul(constants.maxUnitForwardSpeed);
+                }
             }
             model::UnitOrder order(
-                direction.mul(constants.maxUnitForwardSpeed),
+                move,
                 (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
                 model::Aim(shooting)
             );
@@ -101,15 +120,29 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
             continue;
         }
 
+
         auto healing_order = healing(myUnit);
         auto loot_order = looting(game.loot, myUnit, game.zone);
 
         if (healing_order) {
-            if (loot_order) {
+            if (dodge_dir) {
+                healing_order->targetVelocity = *dodge_dir;
+            }
+
+            if (loot_order && !dodge_dir) {
                 healing_order->targetDirection = loot_order->targetDirection;
                 healing_order->targetVelocity = loot_order->targetVelocity;
             }
             actions.insert({myUnit.id, *healing_order});
+            continue;
+        }
+
+        if (dodge_dir) {
+            model::UnitOrder order(
+                *dodge_dir,
+                myUnit.direction,
+                std::nullopt);
+            actions.insert({myUnit.id, order});
             continue;
         }
 
@@ -137,14 +170,59 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     return model::Order(actions);
 }
 
-model::Vec2 MyStrategy::dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit) {
+void MyStrategy::simulateMovement(const model::Unit& myUnit, const std::vector<model::Projectile>& bullets) const {
+    double offset = 360.0 / 16.0;
+    for (int ang = 0; ang < 360; ang += offset) {
+        auto dir = myUnit.direction.clone().rotate(ang);
+
+        auto sim_unit(myUnit);
+        auto sim_bullets(bullets);
+        model::UnitOrder order(
+            dir * constants.maxUnitForwardSpeed,
+            sim_unit.direction,
+            std::nullopt);
+
+        auto damage = simulator.Simulate(sim_unit, order, sim_bullets, 30);
+
+        if (debugInterface) {
+            debugInterface->addRing(sim_unit.position, constants.unitRadius, 0.1, debugging::Color(0, 0, 1, 1));
+            debugInterface->addPlacedText(sim_unit.position, std::to_string(damage), {0, -1}, 0.3, debugging::Color(0, 0, 0, 0.5));
+        }
+    }
+}
+
+std::optional<model::Vec2> MyStrategy::dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit) {
     if (bullets.empty()) {
-        return myUnit.velocity;
+        return std::nullopt;
     }
 
-    auto res = simulator.Simulate(myUnit, bullets, 1);
-    // std::cerr << res.second << std::endl;
-    return res.first;
+    double offset = 360.0 / 16.0;
+    double min_damage = 1e9;
+    std::optional<model::Vec2> res;
+
+    for (int ang = 0; ang < 360; ang += offset) {
+        auto dir = myUnit.direction.clone().rotate(ang);
+
+        auto sim_unit(myUnit);
+        auto sim_bullets(bullets);
+        model::UnitOrder order(
+            dir * constants.maxUnitForwardSpeed,
+            sim_unit.direction,
+            std::nullopt);
+
+        auto damage = simulator.Simulate(sim_unit, order, sim_bullets, 30);
+        if (damage < min_damage) {
+            min_damage = damage;
+            res = dir * constants.maxUnitForwardSpeed;
+        }
+
+        if (debugInterface) {
+            debugInterface->addRing(sim_unit.position, constants.unitRadius, 0.1, debugging::Color(0, 0, 1, 1));
+            debugInterface->addPlacedText(sim_unit.position, std::to_string(damage), {0, -1}, 0.3, debugging::Color(0, 0, 0, 0.5));
+        }
+    }
+
+    return res;
 }
 
 std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) const {

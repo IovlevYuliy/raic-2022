@@ -44,6 +44,11 @@ namespace model {
 
     Vec2& Vec2::norm() {
         double l = len();
+
+        if (l < 1e-8) {
+            return *this;
+        }
+
         x /= l;
         y /= l;
 

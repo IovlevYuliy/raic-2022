@@ -21,9 +21,11 @@ public:
     MyStrategy(const model::Constants& constants);
     model::Order getOrder(model::Game& game, DebugInterface* debugInterface);
 
-    model::Vec2 dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit);
+    std::optional<model::Vec2> dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit);
     std::optional<model::UnitOrder> looting(std::vector<model::Loot>& loots, const model::Unit& myUnit, const model::Zone& zone) const;
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
+
+    void simulateMovement(const model::Unit& myUnit, const std::vector<model::Projectile>& bullets) const;
 
     static model::Constants* getConstants();
 
