@@ -46,7 +46,8 @@ public:
     // Get string representation of Projectile
     std::string toString() const;
 
-    bool hasHit(const model::Unit& unit) const;
+    std::optional<model::Vec2> hasHit(const model::Unit& unit) const;
+    std::optional<model::Vec2> hasHit(const model::Obstacle& obstacle) const;
 };
 
 }

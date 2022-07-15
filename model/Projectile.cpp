@@ -75,7 +75,7 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         return ray.intersectsCircle(center, radius);
     }
 
-    bool Projectile::hasHit(const model::Unit& unit) const {
+    std::optional<model::Vec2> Projectile::hasHit(const model::Unit& unit) const {
         auto c0 = position - unit.position;
         auto v = velocity - unit.velocity;
         double a = v.x * v.x + v.y * v.y;
@@ -84,16 +84,36 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         double d = b * b - 4 * a * c;
 
         if (d < 0) {
-            return false;
+            return std::nullopt;
         }
 
         double t = (-b + sqrt(d)) / 2.0 / a;
 
         if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
-            return false;
+            return std::nullopt;
         }
 
-        return true;
+        return position + velocity * t;
+    }
+
+    std::optional<model::Vec2> Projectile::hasHit(const model::Obstacle& obstacle) const {
+        auto c0 = position - obstacle.position;
+        double a = velocity.x * velocity.x + velocity.y * velocity.y;
+        double b = 2 * c0.x * velocity.x + 2 * c0.y * velocity.y;
+        double c = c0.x * c0.x + c0.y * c0.y - obstacle.radius * obstacle.radius;
+        double d = b * b - 4 * a * c;
+
+        if (d < 0) {
+            return std::nullopt;
+        }
+
+        double t = (-b + sqrt(d)) / 2.0 / a;
+
+        if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
+            return std::nullopt;
+        }
+
+        return position + velocity * t;
     }
 
 }

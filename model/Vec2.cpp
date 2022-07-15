@@ -56,8 +56,8 @@ namespace model {
     }
 
     Vec2& Vec2::rotate(const double angle) {
-        double new_x = x * cos(angle * M_PI / 180.0) - y * sin(angle * M_PI / 180.0);
-        double new_y = x * sin(angle * M_PI / 180.0) + y * cos(angle * M_PI / 180.0);
+        double new_x = x * cos(angle) - y * sin(angle);
+        double new_y = x * sin(angle) + y * cos(angle);
         x = new_x;
         y = new_y;
 
@@ -74,6 +74,13 @@ namespace model {
     Vec2& Vec2::div(const double& scalar) {
         x /= scalar;
         y /= scalar;
+
+        return *this;
+    }
+
+    Vec2& Vec2::add(const Vec2& vec) {
+        x += vec.x;
+        y += vec.y;
 
         return *this;
     }

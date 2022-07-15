@@ -38,6 +38,7 @@ public:
     Vec2& norm();
     Vec2& mul(const double& scalar);
     Vec2& div(const double& scalar);
+    Vec2& add(const Vec2& vec);
     Vec2 clone() const;
 
     double dot(const Vec2& vec) const {
