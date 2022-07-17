@@ -67,11 +67,21 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
 model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit>& enemies, const std::vector<model::Projectile>& bullets, const std::vector<model::Loot>& loot, const model::Zone& zone) const {
     std::vector<model::UnitOrder> orders;
+    std::vector<model::Obstacle> obstacles;
 
     if (debugInterface) {
         myUnit.calcSpeedCircle(constants);
         myUnit.showSpeedCircle(debugInterface);
     }
+
+    for (auto &obstacle : constants.obstacles) {
+        auto dist = myUnit.position.distTo(obstacle.position) - obstacle.radius;
+        if(dist < constants.viewDistance) {
+            obstacles.emplace_back(obstacle);
+        }
+    }
+
+    cerr << "obstacles " << obstacles.size() << endl;
 
     std::optional<model::Unit> nearest_enemy;
     double min_dist_to_enemy = 1e9;
@@ -87,7 +97,7 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
     // simulateMovement(myUnit, threats);
 
     for (size_t ii = 0; ii < 1; ++ii) {
-        if (nearest_enemy && has_ammo && (myUnit.health > 0.2 * constants.unitHealth || nearest_enemy->health < 0.5 * constants.unitHealth) && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 4) {
+        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 4) {
             bool shooting = false;
             double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
@@ -126,10 +136,6 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
                 (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
                 model::Aim(shooting)
             ));
-
-            // if (debugInterface && shooting) {
-            //     debugInterface->addPolyLine({myUnit.position, (nearest_enemy->position + nearest_enemy->velocity * 0.5) }, 0.1, debugging::Color(0, 0, 1, 1));
-            // }
 
             continue;
         }
@@ -173,8 +179,10 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
         ));
     }
 
-    auto vel = myUnit.velocity.clone();
-    auto dir = myUnit.direction.clone();
+    auto initial_velocaity = myUnit.velocity.isEmpty() ? model::Vec2(1, 0) : myUnit.velocity;
+
+    auto vel = initial_velocaity;
+    auto dir = myUnit.direction;
     for (size_t it1 = 0; it1 < 16; ++it1) {
         // for (size_t it2 = 0; it2 < 4; ++it2) {
             orders.push_back(model::UnitOrder(
@@ -187,8 +195,8 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
         vel.rotate(M_PI / 8);
     }
 
-    vel = myUnit.velocity.clone();
-    dir = myUnit.direction.clone();
+    vel = initial_velocaity;
+    dir = myUnit.direction;
     for (size_t it1 = 0; it1 < 16; ++it1) {
         // for (size_t it2 = 0; it2 < 4; ++it2) {
            orders.push_back(model::UnitOrder(
@@ -203,14 +211,16 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
 
     int min_damage = 1e9;
     model::UnitOrder* best_order;
+    model::Vec2 best_velocity;
     for (auto& order: orders) {
         auto sim_unit(myUnit);
         auto sim_bullets(bullets);
 
-        auto damage = simulator.Simulate(sim_unit, order, sim_bullets, enemies, zone, simulator.started_tick);
+        auto damage = simulator.Simulate(sim_unit, order, sim_bullets, enemies, obstacles, zone, simulator.started_tick);
         if (damage < min_damage) {
             min_damage = damage;
             best_order = &order;
+            best_velocity = sim_unit.dbg_velocity;
         }
 
         if (debugInterface) {
@@ -219,6 +229,9 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
         }
     }
 
+    if (debugInterface) {
+        debugInterface->addPolyLine({myUnit.position, myUnit.position + best_velocity }, 0.1, debugging::Color(1, 0, 0, 1));
+    }
     return *best_order;
 }
 
@@ -274,7 +287,7 @@ std::optional<model::Vec2> MyStrategy::dodging(std::vector<model::Projectile>& b
     //     }
     // }
 
-    // return res;
+    return {};
 }
 
 std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) const {

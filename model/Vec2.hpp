@@ -35,6 +35,8 @@ public:
 
     double len() const;
 
+    bool isEmpty();
+
     Vec2& norm();
     Vec2& mul(const double& scalar);
     Vec2& div(const double& scalar);

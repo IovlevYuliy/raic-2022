@@ -42,6 +42,10 @@ namespace model {
         return sqrt(x * x + y * y);
     }
 
+    bool Vec2::isEmpty() {
+        return x * x + y * y < 1e-9;
+    }
+
     Vec2& Vec2::norm() {
         double l = len();
 
@@ -88,6 +92,4 @@ namespace model {
     Vec2 Vec2::clone() const {
         return {x, y};
     }
-
-
 }

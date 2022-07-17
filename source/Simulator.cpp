@@ -36,7 +36,13 @@ std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::ve
     return { cur_velocity, std::min(damage, res.second) };
 }
 
-int Simulator::Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<model::Projectile>& bullets, const std::vector<model::Unit>& enemies, const model::Zone& zone, int cur_tick) const {
+int Simulator::Simulate(
+        model::Unit& unit, model::UnitOrder& order,
+        std::vector<model::Projectile>& bullets,
+        const std::vector<model::Unit>& enemies,
+        const std::vector<model::Obstacle>& obstacles,
+        const model::Zone& zone,
+        int cur_tick) const {
     if (cur_tick - started_tick >= SIMULATED_TICKS)  {
         return 0;
     }
@@ -53,16 +59,16 @@ int Simulator::Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<
     unit.aim = std::clamp(unit.aim, 0.0, 1.0);
 
     // SIMULATE UNIT ROTATION
-    double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
-    double diff_angle = asin(sin_a);
-    double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
-    double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
-    double angle_shift = rotation_speed * delta_time;
-    if (sin_a > 0) {
-        unit.direction.rotate(angle_shift);
-    } else {
-        unit.direction.rotate(2 * M_PI - angle_shift);
-    }
+    // double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
+    // double diff_angle = asin(sin_a);
+    // double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
+    // double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
+    // double angle_shift = rotation_speed * delta_time;
+    // if (sin_a > 0) {
+    //     unit.direction.rotate(angle_shift);
+    // } else {
+    //     unit.direction.rotate(2 * M_PI - angle_shift);
+    // }
 
     // SIMULATE UNIT SHOOTING
     if (1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick) {
@@ -90,6 +96,7 @@ int Simulator::Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<
 
     auto velocity_shift = (target_velocity - unit.velocity).norm().mul(constants.unitAcceleration * delta_time);
     unit.velocity += velocity_shift;
+    unit.dbg_velocity = unit.velocity;
 
     // SIMULATE BULLETS MOVEMENT
     for (auto& bullet : bullets) {
@@ -99,23 +106,23 @@ int Simulator::Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<
 
         std::optional<model::Vec2> obstacle_hit;
         double obstacle_min_dist = 1e9;
-        // for (auto& obstacle : constants.obstacles) {
-        //     if (obstacle.canShootThrough) {
-        //         continue;
-        //     }
-        //     if ((bullet.position.distTo(obstacle.position) - obstacle.radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > bullet.lifeTime) {
-        //         continue;
-        //     }
-        //     auto hit = bullet.hasHit(obstacle);
-        //     if (!hit) {
-        //         continue;
-        //     }
-        //     double dist = bullet.position.distTo(*hit);
-        //     if (dist < obstacle_min_dist) {
-        //         obstacle_min_dist = dist;
-        //         obstacle_hit = hit;
-        //     }
-        // }
+        for (auto& obstacle : obstacles) {
+            if (obstacle.canShootThrough) {
+                continue;
+            }
+            if ((bullet.position.distTo(obstacle.position) - obstacle.radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > bullet.lifeTime) {
+                continue;
+            }
+            auto hit = bullet.hasHit(obstacle);
+            if (!hit) {
+                continue;
+            }
+            double dist = bullet.position.distTo(*hit);
+            if (dist < obstacle_min_dist) {
+                obstacle_min_dist = dist;
+                obstacle_hit = hit;
+            }
+        }
 
         auto unit_hit = bullet.hasHit(unit);
 
@@ -155,15 +162,7 @@ int Simulator::Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<
         damage += 1;
     }
 
-    // if (!damage) {
-    //     return { cur_velocity, damage };
-    // }
-
-    // model::Unit sim_unit(unit);
-    // sim_unit.position += cur_velocity * delta_time;
-    // auto res = Simulate(sim_unit, bullets, target_dir, ticks - 1);
-
-    damage += Simulate(unit, order, bullets, enemies, zone, cur_tick + 1);
+    damage += Simulate(unit, order, bullets, enemies, obstacles, zone, cur_tick + 1);
 
     return damage;
 }

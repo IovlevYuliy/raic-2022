@@ -14,7 +14,14 @@ public:
 
     std::pair<model::Vec2, int> Simulate(const model::Unit& unit, std::vector<model::Projectile>& bullets, model::Vec2& target_dir, int ticks);
 
-    int Simulate(model::Unit& unit, model::UnitOrder& order, std::vector<model::Projectile>& bullets, const std::vector<model::Unit>& enemies, const model::Zone& zone, int ticks) const;
+    int Simulate(
+        model::Unit& unit,
+        model::UnitOrder& order,
+        std::vector<model::Projectile>& bullets,
+        const std::vector<model::Unit>& enemies,
+        const std::vector<model::Obstacle>& obstacles,
+        const model::Zone& zone,
+        int ticks) const;
 
     model::Constants constants;
     int started_tick = 0;
