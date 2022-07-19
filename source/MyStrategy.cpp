@@ -180,7 +180,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
     // simulateMovement(myUnit, threats);
 
     for (size_t ii = 0; ii < 1; ++ii) {
-        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 2 && (has_bow && zone.currentRadius > radius_treshold)) {
+        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 2 && ((has_bow && zone.currentRadius > radius_treshold) || zone.currentRadius < radius_treshold)) {
             bool shooting = false;
             double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
@@ -420,14 +420,15 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
             continue;
         }
 
-        if (std::holds_alternative<model::ShieldPotions>(loot.item) && myUnit.shieldPotions < constants.maxShieldPotionsInInventory - 3 && myUnit.weapon && (zone.currentRadius > radius_treshold && constants.weapons[*myUnit.weapon].name == "Bow" && myUnit.ammo[*myUnit.weapon] > 0)) {
+        if (std::holds_alternative<model::ShieldPotions>(loot.item) && myUnit.shieldPotions < constants.maxShieldPotionsInInventory - 3 && myUnit.weapon && myUnit.ammo[*myUnit.weapon] > 0 &&
+            ((zone.currentRadius > radius_treshold && constants.weapons[*myUnit.weapon].name == "Bow") || zone.currentRadius < radius_treshold)) {
             nearest_loot = loot;
             min_dist = dist_to_loot;
         }
 
         if (std::holds_alternative<model::Ammo>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
             auto ammo = std::get<model::Ammo>(loot.item);
-            if (constants.weapons[ammo.weaponTypeIndex].name == "Magic wand" || constants.weapons[ammo.weaponTypeIndex].name == "Staff" && zone.currentRadius > radius_treshold) {
+            if ((constants.weapons[ammo.weaponTypeIndex].name == "Magic wand" || constants.weapons[ammo.weaponTypeIndex].name == "Staff") && zone.currentRadius > radius_treshold) {
                 continue;
             }
 
@@ -439,7 +440,7 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
 
         if (std::holds_alternative<model::Weapon>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
             auto weapon = std::get<model::Weapon>(loot.item);
-            if (constants.weapons[weapon.typeIndex].name == "Magic wand" || constants.weapons[weapon.typeIndex].name == "Staff" && zone.currentRadius > radius_treshold) {
+            if ((constants.weapons[weapon.typeIndex].name == "Magic wand" || constants.weapons[weapon.typeIndex].name == "Staff") && zone.currentRadius > radius_treshold) {
                 continue;
             }
 
