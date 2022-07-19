@@ -78,7 +78,8 @@ int Simulator::Simulate(
         //     has_hit = has_hit || bullet_ray.intersectsCircle(enemy.position, constants.unitRadius);
         // }
         // if (has_hit) {
-        unit.nextShotTick = cur_tick + ceil(1 / constants.weapons[*unit.weapon].roundsPerSecond * constants.ticksPerSecond);
+        unit.nextShotTick = 1e9;
+        //cur_tick + ceil(1 / constants.weapons[*unit.weapon].roundsPerSecond * constants.ticksPerSecond);
         damage -= constants.weapons[*unit.weapon].projectileDamage / 2;
         // }
     }

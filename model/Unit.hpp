@@ -52,6 +52,7 @@ public:
     int shieldPotions;
 
     int unit_radius = 0;
+    int index = 0;
 
     double speed_radius = 0;
     model::Vec2 speed_center;

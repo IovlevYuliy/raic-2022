@@ -39,10 +39,12 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         }
     }
 
+    int i = 0;
     for (model::Unit &myUnit : game.units) {
         if (myUnit.playerId != game.myId)
             continue;
 
+        myUnit.index = i;
         if (debugInterface) {
             for (auto &projectile : threats) {
                 if (projectile.intersectUnit(myUnit, constants)) {
@@ -53,6 +55,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
         auto unitOrder = getUnitOrder(myUnit, enemies, threats, game.loot, game.zone);
         actions.insert({ myUnit.id, unitOrder });
+        ++i;
     }
 
     if (debugInterface) {
@@ -98,14 +101,23 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
     bool is_spawn = myUnit.remainingSpawnTime.has_value();
 
     if (is_spawn) {
-        auto loot_order = looting(loot, myUnit, zone);
-        if (loot_order) {
-            return *loot_order;
+        auto move_to = zone.nextCenter;
+        if (myUnit.index == 0) {
+            move_to.x -= zone.currentRadius / 2;
+        }
+        if (myUnit.index == 1) {
+            move_to.x += zone.currentRadius / 2;
+        }
+        if (myUnit.index == 2) {
+            move_to.y += zone.currentRadius / 2;
+        }
+        if (myUnit.index == 3) {
+            move_to.y -= zone.currentRadius / 2;
         }
 
         return model::UnitOrder(
-            (zone.nextCenter - myUnit.position) * constants.zoneSpeed,
-            {-myUnit.direction.y, myUnit.direction.x},
+            (move_to - myUnit.position) * constants.zoneSpeed,
+            (move_to - myUnit.position),
             std::nullopt
         );
     }
@@ -143,11 +155,15 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
             if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / dist_coef) {
                 move.rotate(M_PI_2);
             }
-            orders.push_back(model::UnitOrder(
-                move,
-                (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
-                model::Aim(shooting)
-            ));
+
+            for (size_t it = 0; it < 16; ++it) {
+                orders.push_back(model::UnitOrder(
+                    move,
+                    (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
+                    model::Aim(shooting)
+                ));
+                move.rotate(M_PI / 8);
+            }
 
             continue;
         }
