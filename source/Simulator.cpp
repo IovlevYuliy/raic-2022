@@ -59,28 +59,28 @@ int Simulator::Simulate(
     unit.aim = std::clamp(unit.aim, 0.0, 1.0);
 
     // SIMULATE UNIT ROTATION
-    // double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
-    // double diff_angle = asin(sin_a);
-    // double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
-    // double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
-    // double angle_shift = rotation_speed * delta_time;
-    // if (sin_a > 0) {
-    //     unit.direction.rotate(angle_shift);
-    // } else {
-    //     unit.direction.rotate(2 * M_PI - angle_shift);
-    // }
+    double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
+    double diff_angle = asin(sin_a);
+    double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
+    double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
+    double angle_shift = rotation_speed * delta_time;
+    if (sin_a > 0) {
+        unit.direction.rotate(angle_shift);
+    } else {
+        unit.direction.rotate(2 * M_PI - angle_shift);
+    }
 
     // SIMULATE UNIT SHOOTING
-    if (1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick) {
-        bool has_hit = false;
-        auto bullet_ray = model::Ray(unit.position, unit.direction);
-        for (auto& enemy : enemies) {
-            has_hit = has_hit || bullet_ray.intersectsCircle(enemy.position, constants.unitRadius);
-        }
-        if (has_hit) {
-            unit.nextShotTick = cur_tick + ceil(1 / constants.weapons[*unit.weapon].roundsPerSecond * constants.ticksPerSecond);
-            damage -= constants.weapons[*unit.weapon].projectileDamage;
-        }
+    if (std::holds_alternative<model::Aim>(*order.action) && std::get<model::Aim>(*order.action).shoot && 1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick ) {
+        // bool has_hit = false;
+        // auto bullet_ray = model::Ray(unit.position, unit.direction);
+        // for (auto& enemy : enemies) {
+        //     has_hit = has_hit || bullet_ray.intersectsCircle(enemy.position, constants.unitRadius);
+        // }
+        // if (has_hit) {
+        unit.nextShotTick = cur_tick + ceil(1 / constants.weapons[*unit.weapon].roundsPerSecond * constants.ticksPerSecond);
+        damage -= constants.weapons[*unit.weapon].projectileDamage / 2;
+        // }
     }
 
     // SIMULATE UNIT MOVEMENT
@@ -94,8 +94,32 @@ int Simulator::Simulate(
         target_velocity = move_dir.mul(max_velocity_len);
     }
 
-    auto velocity_shift = (target_velocity - unit.velocity).norm().mul(constants.unitAcceleration * delta_time);
+    auto velocity_shift = (target_velocity - unit.velocity);
+    if (velocity_shift.len() > constants.unitAcceleration * delta_time) {
+        velocity_shift.norm().mul(constants.unitAcceleration * delta_time);
+    }
     unit.velocity += velocity_shift;
+
+    bool has_collision = false;
+    for (auto& obstacle : obstacles) {
+        auto hit = unit.hasHit(obstacle);
+
+        if (hit) {
+            has_collision = true;
+            double f1_time = *hit;
+            double f2_time = delta_time - f1_time;
+            unit.next_position = unit.position + unit.velocity * f1_time;
+            auto v = (obstacle.position - unit.next_position).norm();
+            unit.velocity = model::Vec2(v.y, -v.x) * (v.cross(unit.velocity) / unit.velocity.len());
+            unit.next_position += unit.velocity * f2_time;
+            break;
+        }
+    }
+    // std::cerr << has_collision << std::endl;
+    if (!has_collision) {
+        unit.next_position = unit.position + unit.velocity * delta_time;
+    }
+
     unit.dbg_velocity = unit.velocity;
 
     // SIMULATE BULLETS MOVEMENT
@@ -156,7 +180,7 @@ int Simulator::Simulate(
         bullet.lifeTime -= delta_time;
     }
 
-    unit.position += unit.velocity * delta_time;
+    unit.position = unit.next_position;
 
     if (zone.currentCenter.distTo(unit.position) + constants.unitRadius > zone.currentRadius) {
         damage += 1;

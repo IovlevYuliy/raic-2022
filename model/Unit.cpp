@@ -1,6 +1,7 @@
 #include "Unit.hpp"
 #include <iostream>
 #include <algorithm>
+#include "MyStrategy.hpp"
 
 namespace model {
 
@@ -197,6 +198,31 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
 
         double len = sqrt(d * d + speed_radius * speed_radius - 2 * d * speed_radius * cos(angle));
         return dir * len;
+    }
+
+    std::optional<double> Unit::hasHit(const model::Obstacle& obstacle) const {
+        auto c0 = position - obstacle.position;
+        double a = velocity.x * velocity.x + velocity.y * velocity.y;
+        if (a < 1e-8) {
+            return std::nullopt;
+        }
+
+        double b = 2 * c0.x * velocity.x + 2 * c0.y * velocity.y;
+        double radius = obstacle.radius + MyStrategy::getConstants()->unitRadius;
+        double c = c0.x * c0.x + c0.y * c0.y - radius * radius;
+        double d = b * b - 4 * a * c;
+
+        if (d < 0) {
+            return std::nullopt;
+        }
+
+        double t = (-b - sqrt(d)) / 2.0 / a;
+
+        if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond) {
+            return std::nullopt;
+        }
+
+        return t;
     }
 
 }

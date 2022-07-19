@@ -47,7 +47,7 @@ player_bace_TCP ={
 config_bace = {
   "seed": None,
   "game": {
-    "Create": "Round1"
+    "Create": "Round2"
   },
   "players": []
 }
@@ -80,6 +80,8 @@ def runProc(i):
         #line = p1.stdout.readline()
         #if line : print(line)
         line=server.stdout.readline()
+        if 'ERROR' in str(line) or 'WARN' in str(line):
+            print(line)
         if 'Dropping' in str(line):
             countDrop+=1
         if countDrop==len(players):
@@ -97,9 +99,10 @@ def runProc(i):
     return (i, results_name)
 
 def calculate_results(list_results):
+    print(list_results)
     for (i, results_name) in list_results:
         with open(results_name) as fp:
-                data=json.load(fp)
+            data=json.load(fp)
         for p in players:
             p.last_score = data['results']['players'][p.number]['score']
             p.total_score+=p.last_score

@@ -22,6 +22,8 @@ public:
     // Item
     model::Item item;
 
+    bool busy = false;
+
     Loot(int id, model::Vec2 position, model::Item item);
 
     // Read Loot from input stream
