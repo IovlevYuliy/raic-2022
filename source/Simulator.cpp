@@ -121,8 +121,6 @@ int Simulator::Simulate(
         unit.next_position = unit.position + unit.velocity * delta_time;
     }
 
-    unit.dbg_velocity = unit.velocity;
-
     // SIMULATE BULLETS MOVEMENT
     for (auto& bullet : bullets) {
         if (bullet.destroyed) {
@@ -135,7 +133,7 @@ int Simulator::Simulate(
             if (obstacle.canShootThrough) {
                 continue;
             }
-            if ((bullet.position.distTo(obstacle.position) - obstacle.radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > bullet.lifeTime) {
+            if ((bullet.position.distTo(obstacle.position) - obstacle.radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > delta_time) {
                 continue;
             }
             auto hit = bullet.hasHit(obstacle);

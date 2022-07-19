@@ -59,7 +59,6 @@ public:
     double max_forward_speed;
     double max_backward_speed;
 
-    model::Vec2 dbg_velocity;
     model::Vec2 next_position;
 
     Unit(int id, int playerId, double health, double shield, int extraLives, model::Vec2 position, std::optional<double> remainingSpawnTime, model::Vec2 velocity, model::Vec2 direction, double aim, std::optional<model::Action> action, int healthRegenerationStartTick, std::optional<int> weapon, int nextShotTick, std::vector<int> ammo, int shieldPotions);

@@ -42,6 +42,7 @@ public:
     DebugInterface *debugInterface = nullptr;
     double delta_time;
     double radius_treshold = 40.0;
+    int elapsed_time = 0.0;
 };
 
 #endif

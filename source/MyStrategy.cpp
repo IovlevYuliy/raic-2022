@@ -64,6 +64,9 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
     std::vector<model::Obstacle*> obstacles;
     for (auto &obstacle : constants.obstacles) {
+        if (obstacle.canShootThrough) {
+            continue;
+        }
         for (auto& myUnit : my_units) {
             auto dist = myUnit.position.distTo(obstacle.position) - obstacle.radius;
             if(dist < constants.viewDistance) {
@@ -77,10 +80,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     for (auto& [key, bullet] : bullets) {
         bool destroyed = false;
         for (auto& obstacle : obstacles) {
-            if (obstacle->canShootThrough) {
-                continue;
-            }
-            if ((bullet.position.distTo(obstacle->position) - obstacle->radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > bullet.lifeTime) {
+            if ((bullet.position.distTo(obstacle->position) - obstacle->radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > delta_time) {
                 continue;
             }
             if (bullet.hasHit(*obstacle)) {
@@ -115,7 +115,10 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
     auto t_end = std::chrono::system_clock::now();
 
+    elapsed_time += std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
     // std::clog << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
+
+    std::cout << "Current tick " << game.currentTick << " -- " << "Elapsed time " << elapsed_time << " ms" << std::endl;
     return model::Order(actions);
 }
 
@@ -295,8 +298,6 @@ model::UnitOrder MyStrategy::getUnitOrder(
 
     int min_damage = 1e9;
     model::UnitOrder* best_order;
-    model::Vec2 best_velocity;
-    model::Vec2 next_position;
 
     std::vector<model::Projectile> sim_bullets;
     for (const auto &b : bullets)
@@ -314,8 +315,6 @@ model::UnitOrder MyStrategy::getUnitOrder(
         if (damage < min_damage) {
             min_damage = damage;
             best_order = &order;
-            best_velocity = sim_unit.dbg_velocity;
-            next_position = sim_unit.next_position;
         }
 
         if (debugInterface) {
@@ -324,10 +323,6 @@ model::UnitOrder MyStrategy::getUnitOrder(
         }
     }
 
-    if (debugInterface) {
-        debugInterface->addPolyLine({myUnit.position, myUnit.position + best_velocity }, 0.1, debugging::Color(1, 0, 0, 1));
-        debugInterface->addPolyLine({myUnit.position, next_position }, 0.1, debugging::Color(0.7, 0.7, 0.7, 1));
-    }
     // cerr << best_order->toString() << endl;
     return *best_order;
 }
