@@ -60,10 +60,10 @@ int Simulator::Simulate(
 
     // SIMULATE UNIT ROTATION
     double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
-    double diff_angle = asin(sin_a);
+    double diff_angle = fabs(asin(sin_a)) * 180 / M_PI;
     double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
     double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
-    double angle_shift = rotation_speed * delta_time;
+    double angle_shift = std::min(diff_angle, rotation_speed * delta_time) * M_PI / 180;
     if (sin_a > 0) {
         unit.direction.rotate(angle_shift);
     } else {
