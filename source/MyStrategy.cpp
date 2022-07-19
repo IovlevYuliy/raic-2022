@@ -11,13 +11,13 @@ model::Constants* MyStrategy::getConstants() {
 
 MyStrategy::MyStrategy(const model::Constants &consts) : constants(consts), simulator(consts) {
     MyStrategy::constants_ = &constants;
+    delta_time = 1.0 / constants.ticksPerSecond;
 }
 
 model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterface) {
     auto t_start = std::chrono::system_clock::now();
 
     simulator.started_tick = game.currentTick;
-
     debugInterface = dbgInterface;
     if (debugInterface) {
         debugInterface->setAutoFlush(false);
@@ -26,7 +26,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
     std::unordered_map<int, model::UnitOrder> actions;
     std::vector<model::Unit> enemies;
-    std::vector<model::Projectile> threats;
+    std::vector<model::Unit> my_units;
     for (auto &unit : game.units) {
         if (unit.playerId != game.myId) {
             enemies.push_back(unit);
@@ -35,7 +35,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
     for (auto &projectile : game.projectiles) {
         if (projectile.shooterPlayerId != game.myId) {
-            threats.push_back(projectile);
+            bullets.insert({ projectile.id, projectile });
         }
     }
 
@@ -43,17 +43,17 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     for (model::Unit &myUnit : game.units) {
         if (myUnit.playerId != game.myId)
             continue;
-
+        my_units.emplace_back(myUnit);
         myUnit.index = i;
         if (debugInterface) {
-            for (auto &projectile : threats) {
+            for (auto &[key, projectile] : bullets) {
                 if (projectile.intersectUnit(myUnit, constants)) {
                     debugInterface->addPolyLine({projectile.position, projectile.position + projectile.velocity * projectile.lifeTime }, 0.1, debugging::Color(0, 0.3, 0.6, 1));
                 }
             }
         }
 
-        auto unitOrder = getUnitOrder(myUnit, enemies, threats, game.loot, game.zone);
+        auto unitOrder = getUnitOrder(myUnit, enemies, game.loot, game.zone);
         actions.insert({ myUnit.id, unitOrder });
         ++i;
     }
@@ -62,13 +62,68 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         debugInterface->flush();
     }
 
+    std::vector<model::Obstacle*> obstacles;
+    for (auto &obstacle : constants.obstacles) {
+        for (auto& myUnit : my_units) {
+            auto dist = myUnit.position.distTo(obstacle.position) - obstacle.radius;
+            if(dist < constants.viewDistance) {
+                obstacles.push_back(&obstacle);
+                break;
+            }
+        }
+    }
+
+    std::vector<int> destroyed_ids;
+    for (auto& [key, bullet] : bullets) {
+        bool destroyed = false;
+        for (auto& obstacle : obstacles) {
+            if (obstacle->canShootThrough) {
+                continue;
+            }
+            if ((bullet.position.distTo(obstacle->position) - obstacle->radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > bullet.lifeTime) {
+                continue;
+            }
+            if (bullet.hasHit(*obstacle)) {
+                destroyed = true;
+                break;
+            }
+        }
+
+        if (destroyed) {
+            destroyed_ids.emplace_back(key);
+            continue;
+        }
+
+        for (auto& unit : my_units) {
+            if (bullet.hasHit(unit)) {
+                destroyed = true;
+                break;
+            }
+        }
+        bullet.position += bullet.velocity * delta_time;
+        bullet.lifeTime -= delta_time;
+
+        if (destroyed || bullet.lifeTime <= 0) {
+            destroyed_ids.emplace_back(key);
+            continue;
+        }
+    }
+
+    for (auto& id: destroyed_ids) {
+        bullets.erase(id);
+    }
+
     auto t_end = std::chrono::system_clock::now();
 
     // std::clog << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
     return model::Order(actions);
 }
 
-model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit>& enemies, const std::vector<model::Projectile>& bullets, const std::vector<model::Loot>& loot, const model::Zone& zone) const {
+model::UnitOrder MyStrategy::getUnitOrder(
+        model::Unit& myUnit,
+        const std::vector<model::Unit>& enemies,
+        const std::vector<model::Loot>& loot,
+        const model::Zone& zone) const {
     std::vector<model::UnitOrder> orders;
     std::vector<model::Obstacle> obstacles;
 
@@ -98,6 +153,7 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
     }
 
     bool has_ammo = myUnit.weapon && myUnit.ammo[*myUnit.weapon] > 0;
+    bool has_bow = myUnit.weapon && constants.weapons[*myUnit.weapon].name == "Bow";
     bool is_spawn = myUnit.remainingSpawnTime.has_value();
 
     if (is_spawn) {
@@ -124,7 +180,7 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
     // simulateMovement(myUnit, threats);
 
     for (size_t ii = 0; ii < 1; ++ii) {
-        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 4) {
+        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 2 && (has_bow && zone.currentRadius > radius_treshold)) {
             bool shooting = false;
             double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
@@ -241,9 +297,18 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const std::vector
     model::UnitOrder* best_order;
     model::Vec2 best_velocity;
     model::Vec2 next_position;
+
+    std::vector<model::Projectile> sim_bullets;
+    for (const auto &b : bullets)
+        sim_bullets.emplace_back(b.second);
+
     for (auto& order: orders) {
         auto sim_unit(myUnit);
-        auto sim_bullets(bullets);
+        for (auto& b: sim_bullets) {
+            b.position = bullets.at(b.id).position;
+            b.lifeTime = bullets.at(b.id).lifeTime;
+            b.destroyed = false;
+        }
 
         auto damage = simulator.Simulate(sim_unit, order, sim_bullets, enemies, obstacles, zone, simulator.started_tick);
         if (damage < min_damage) {
@@ -323,7 +388,7 @@ std::optional<model::Vec2> MyStrategy::dodging(std::vector<model::Projectile>& b
 }
 
 std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) const {
-    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0) {
+    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0 && myUnit.ammo[*myUnit.weapon] > 0) {
         return model::UnitOrder(
             myUnit.direction * constants.maxUnitForwardSpeed,
             {-myUnit.position.x, -myUnit.position.y},
@@ -355,14 +420,14 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
             continue;
         }
 
-        if (std::holds_alternative<model::ShieldPotions>(loot.item) && myUnit.shieldPotions < constants.maxShieldPotionsInInventory / 2) {
+        if (std::holds_alternative<model::ShieldPotions>(loot.item) && myUnit.shieldPotions < constants.maxShieldPotionsInInventory - 3 && myUnit.weapon && (zone.currentRadius > radius_treshold && constants.weapons[*myUnit.weapon].name == "Bow" && myUnit.ammo[*myUnit.weapon] > 0)) {
             nearest_loot = loot;
             min_dist = dist_to_loot;
         }
 
         if (std::holds_alternative<model::Ammo>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
             auto ammo = std::get<model::Ammo>(loot.item);
-            if (constants.weapons[ammo.weaponTypeIndex].name == "Magic wand" || constants.weapons[ammo.weaponTypeIndex].name == "Staff") {
+            if (constants.weapons[ammo.weaponTypeIndex].name == "Magic wand" || constants.weapons[ammo.weaponTypeIndex].name == "Staff" && zone.currentRadius > radius_treshold) {
                 continue;
             }
 
@@ -374,7 +439,7 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
 
         if (std::holds_alternative<model::Weapon>(loot.item) && myUnit.health > constants.unitHealth * 0.7) {
             auto weapon = std::get<model::Weapon>(loot.item);
-            if (constants.weapons[weapon.typeIndex].name == "Magic wand" || constants.weapons[weapon.typeIndex].name == "Staff") {
+            if (constants.weapons[weapon.typeIndex].name == "Magic wand" || constants.weapons[weapon.typeIndex].name == "Staff" && zone.currentRadius > radius_treshold) {
                 continue;
             }
 
@@ -404,7 +469,7 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
     }
 
     return model::UnitOrder(
-        dir.mul(constants.maxUnitForwardSpeed),
+        {0, 0},
         dir,
         model::Pickup(nearest_loot->id)
     );

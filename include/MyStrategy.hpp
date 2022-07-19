@@ -8,9 +8,11 @@
 #include "model/Order.hpp"
 #include "model/Item.hpp"
 #include "model/ActionType.hpp"
+#include "model/Projectile.hpp"
 #include "model/Zone.hpp"
-#include "iostream"
-#include "memory"
+#include <iostream>
+#include <memory>
+#include <unordered_map>
 
 using std::cerr;
 using std::endl;
@@ -27,7 +29,7 @@ public:
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
 
     void simulateMovement(const model::Unit& myUnit, const std::vector<model::Projectile>& bullets) const;
-    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit>& enemies, const std::vector<model::Projectile>& bullets, const std::vector<model::Loot>& loot, const model::Zone& zone) const;
+    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone) const;
 
     static model::Constants* getConstants();
 
@@ -36,7 +38,10 @@ public:
 
     Simulator simulator;
     model::Constants constants;
+    std::unordered_map<int, model::Projectile> bullets;
     DebugInterface *debugInterface = nullptr;
+    double delta_time;
+    double radius_treshold = 40.0;
 };
 
 #endif
