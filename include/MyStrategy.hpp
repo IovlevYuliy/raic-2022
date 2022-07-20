@@ -43,6 +43,7 @@ public:
     double delta_time;
     double radius_treshold = 40.0;
     int elapsed_time = 0.0;
+    model::Vec2 default_dir{1, 0};
 };
 
 #endif

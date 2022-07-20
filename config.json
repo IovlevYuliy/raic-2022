@@ -1,0 +1,28 @@
+{
+  "seed": null,
+  "game": {
+    "Create": "Round2"
+  },
+  "players": [
+    {
+      "Tcp": {
+        "host": null,
+        "port": 31001,
+        "accept_timeout": null,
+        "single_timeout": 1,
+        "total_time_limit": 300,
+        "token": null,
+        "run": {
+          "working_directory": "../build",
+          "build_command": [
+            "make",
+            "-j8"
+          ],
+          "run_command": [
+            "./ai_cup_22"
+          ]
+        }
+      }
+    }
+  ]
+}

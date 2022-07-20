@@ -16,6 +16,7 @@ MyStrategy::MyStrategy(const model::Constants &consts) : constants(consts), simu
 
 model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterface) {
     auto t_start = std::chrono::system_clock::now();
+    default_dir.rotate(M_PI / 500);
 
     simulator.started_tick = game.currentTick;
     debugInterface = dbgInterface;
@@ -118,7 +119,6 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     elapsed_time += std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
     // std::clog << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
 
-    std::cout << "Current tick " << game.currentTick << " -- " << "Elapsed time " << elapsed_time << " ms" << std::endl;
     return model::Order(actions);
 }
 
@@ -162,20 +162,20 @@ model::UnitOrder MyStrategy::getUnitOrder(
     if (is_spawn) {
         auto move_to = zone.nextCenter;
         if (myUnit.index == 0) {
-            move_to.x -= zone.currentRadius / 2;
+            move_to.x -= zone.currentRadius / 1.5;
         }
         if (myUnit.index == 1) {
-            move_to.x += zone.currentRadius / 2;
+            move_to.x += zone.currentRadius / 1.5;
         }
         if (myUnit.index == 2) {
-            move_to.y += zone.currentRadius / 2;
+            move_to.y += zone.currentRadius / 1.5;
         }
         if (myUnit.index == 3) {
-            move_to.y -= zone.currentRadius / 2;
+            move_to.y -= zone.currentRadius / 1.5;
         }
 
         return model::UnitOrder(
-            (move_to - myUnit.position) * constants.zoneSpeed,
+            (move_to - myUnit.position).mul(constants.zoneSpeed),
             (move_to - myUnit.position),
             std::nullopt
         );
@@ -235,11 +235,10 @@ model::UnitOrder MyStrategy::getUnitOrder(
                 healing_order->targetDirection = loot_order->targetDirection;
                 healing_order->targetVelocity = loot_order->targetVelocity;
             }
-            orders.push_back(*healing_order);
 
-            for (size_t it = 0; it < 16; ++it) {
+            for (size_t it = 0; it < 8; ++it) {
                 orders.push_back(*healing_order);
-                healing_order->targetDirection.rotate(M_PI / 8);
+                healing_order->targetDirection.rotate(M_PI / 4);
             }
 
             continue;
@@ -260,13 +259,13 @@ model::UnitOrder MyStrategy::getUnitOrder(
         }
 
         orders.push_back(model::UnitOrder(
-            (zone.nextCenter - myUnit.position) * constants.zoneSpeed,
+            (zone.nextCenter + default_dir * 0.9 * zone.nextRadius - myUnit.position),
             {-myUnit.direction.y, myUnit.direction.x},
             std::nullopt
         ));
     }
 
-    auto initial_velocaity = myUnit.velocity.isEmpty() ? model::Vec2(1, 0) : myUnit.velocity;
+    auto initial_velocaity = myUnit.velocity.isEmpty() ? default_dir : myUnit.velocity;
 
     auto vel = initial_velocaity;
     for (size_t it1 = 0; it1 < 16; ++it1) {
@@ -286,7 +285,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
     for (size_t it1 = 0; it1 < 16; ++it1) {
         auto dir = myUnit.direction;
         for (size_t it2 = 0; it2 < 8; ++it2) {
-           orders.push_back(model::UnitOrder(
+            orders.push_back(model::UnitOrder(
                 vel * constants.maxUnitForwardSpeed,
                 dir,
                 model::Aim(false)
@@ -298,6 +297,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
 
     int min_damage = 1e9;
     model::UnitOrder* best_order;
+    model::Vec2 vec;
 
     std::vector<model::Projectile> sim_bullets;
     for (const auto &b : bullets)
@@ -321,6 +321,11 @@ model::UnitOrder MyStrategy::getUnitOrder(
             debugInterface->addRing(sim_unit.position, constants.unitRadius, 0.1, debugging::Color(0, 0, 1, 1));
             debugInterface->addPlacedText(sim_unit.position, std::to_string(damage), {0, -1}, 0.3, debugging::Color(0, 0, 0, 0.5));
         }
+    }
+
+    if (debugInterface) {
+        debugInterface->addPolyLine({myUnit.position, myUnit.position + best_order->targetVelocity}, 0.1, debugging::Color(1, 0, 0, 1));
+        debugInterface->addPolyLine({myUnit.position, myUnit.position + best_order->targetDirection}, 0.1, debugging::Color(1, 0, 0, 1));
     }
 
     // cerr << best_order->toString() << endl;
@@ -383,7 +388,8 @@ std::optional<model::Vec2> MyStrategy::dodging(std::vector<model::Projectile>& b
 }
 
 std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) const {
-    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0 && myUnit.ammo[*myUnit.weapon] > 0) {
+    double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
+    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0 && myUnit.ammo[*myUnit.weapon] > 0 && !myUnit.action && myUnit.aim < aim_delta) {
         return model::UnitOrder(
             myUnit.direction * constants.maxUnitForwardSpeed,
             {-myUnit.position.x, -myUnit.position.y},
@@ -473,4 +479,6 @@ std::optional<model::UnitOrder> MyStrategy::looting(const std::vector<model::Loo
 
 void MyStrategy::debugUpdate(int displayedTick, DebugInterface& dbgInterface) {}
 
-void MyStrategy::finish() {}
+void MyStrategy::finish() {
+    std::cout << "Last tick " << simulator.started_tick << " -- " << "Elapsed time " << elapsed_time << " ms" << std::endl;
+}

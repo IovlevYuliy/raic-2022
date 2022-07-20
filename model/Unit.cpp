@@ -180,7 +180,7 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
     void Unit::showSpeedCircle(DebugInterface *debugInterface) const {
         debugInterface->addRing(speed_center, speed_radius, 0.1, debugging::Color(0, 0, 0, 0.5));
         debugInterface->addPolyLine({position, position + velocity}, 0.1, debugging::Color(0, 1, 0, 1));
-        debugInterface->addPolyLine({position, position + direction}, 0.1, debugging::Color(1, 1, 0, 1));
+        debugInterface->addPolyLine({position, position + direction}, 0.1, debugging::Color(0, 1, 0, 1));
 
         std::stringstream ss;
         ss.precision(3);

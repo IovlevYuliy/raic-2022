@@ -59,16 +59,13 @@ int Simulator::Simulate(
     unit.aim = std::clamp(unit.aim, 0.0, 1.0);
 
     // SIMULATE UNIT ROTATION
-    double sin_a = std::clamp(order.targetDirection.cross(unit.direction), -1.0, 1.0);
-    double diff_angle = fabs(asin(sin_a)) * 180 / M_PI;
+    double diff_angle = atan2(order.targetDirection.cross(unit.direction), order.targetDirection.dot(unit.direction)) * 180 / M_PI;
     double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
     double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
-    double angle_shift = std::min(diff_angle, rotation_speed * delta_time) * M_PI / 180;
-    if (sin_a > 0) {
-        unit.direction.rotate(angle_shift);
-    } else {
-        unit.direction.rotate(2 * M_PI - angle_shift);
-    }
+    double sign = diff_angle > 0 ? -1 : 1;
+
+    double angle_shift = sign * std::min(fabs(diff_angle), rotation_speed * delta_time) * M_PI / 180;
+    unit.direction.rotate(angle_shift);
 
     // SIMULATE UNIT SHOOTING
     if (std::holds_alternative<model::Aim>(*order.action) && std::get<model::Aim>(*order.action).shoot && 1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick ) {
@@ -181,8 +178,8 @@ int Simulator::Simulate(
 
     unit.position = unit.next_position;
 
-    if (zone.currentCenter.distTo(unit.position) + constants.unitRadius > zone.currentRadius) {
-        damage += 1;
+    if (zone.currentCenter.distTo(unit.position) + constants.unitRadius >= zone.currentRadius) {
+        damage += 2;
     }
 
     damage += Simulate(unit, order, bullets, enemies, obstacles, zone, cur_tick + 1);
