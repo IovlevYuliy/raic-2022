@@ -39,8 +39,8 @@ std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::ve
 int Simulator::Simulate(
         model::Unit& unit, model::UnitOrder& order,
         std::vector<model::Projectile>& bullets,
-        const std::vector<model::Unit>& enemies,
-        const std::vector<model::Obstacle>& obstacles,
+        const std::vector<model::Unit*>& enemies,
+        const std::vector<const model::Obstacle*>& obstacles,
         const model::Zone& zone,
         int cur_tick) const {
     if (cur_tick - started_tick >= SIMULATED_TICKS)  {
@@ -86,7 +86,7 @@ int Simulator::Simulate(
     auto move_dir = order.targetVelocity.clone().norm();
     auto max_velocity_len = unit.getVelocity(move_dir).len();
     model::Vec2 target_velocity;
-    if (max_velocity_len > order.targetVelocity.len()) {
+    if (max_velocity_len >= order.targetVelocity.len()) {
         target_velocity = order.targetVelocity;
     } else {
         target_velocity = move_dir.mul(max_velocity_len);
@@ -100,14 +100,14 @@ int Simulator::Simulate(
 
     bool has_collision = false;
     for (auto& obstacle : obstacles) {
-        auto hit = unit.hasHit(obstacle);
+        auto hit = unit.hasHit(*obstacle);
 
         if (hit) {
             has_collision = true;
             double f1_time = *hit;
             double f2_time = delta_time - f1_time;
             unit.next_position = unit.position + unit.velocity * f1_time;
-            auto v = (obstacle.position - unit.next_position).norm();
+            auto v = (obstacle->position - unit.next_position).norm();
             unit.velocity = model::Vec2(v.y, -v.x) * (v.cross(unit.velocity) / unit.velocity.len());
             unit.next_position += unit.velocity * f2_time;
             break;
@@ -127,13 +127,13 @@ int Simulator::Simulate(
         std::optional<model::Vec2> obstacle_hit;
         double obstacle_min_dist = 1e9;
         for (auto& obstacle : obstacles) {
-            if (obstacle.canShootThrough) {
+            if (obstacle->canShootThrough) {
                 continue;
             }
-            if ((bullet.position.distTo(obstacle.position) - obstacle.radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > delta_time) {
+            if ((bullet.position.distTo(obstacle->position) - obstacle->radius) / constants.weapons[bullet.weaponTypeIndex].projectileSpeed > delta_time) {
                 continue;
             }
-            auto hit = bullet.hasHit(obstacle);
+            auto hit = bullet.hasHit(*obstacle);
             if (!hit) {
                 continue;
             }

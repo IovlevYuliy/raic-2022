@@ -26,11 +26,11 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
     }
 
     std::unordered_map<int, model::UnitOrder> actions;
-    std::vector<model::Unit> enemies;
+    std::vector<model::Unit*> enemies;
     std::vector<model::Unit> my_units;
     for (auto &unit : game.units) {
         if (unit.playerId != game.myId) {
-            enemies.push_back(unit);
+            enemies.push_back(&unit);
         }
     }
 
@@ -124,11 +124,11 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
 
 model::UnitOrder MyStrategy::getUnitOrder(
         model::Unit& myUnit,
-        const std::vector<model::Unit>& enemies,
+        const std::vector<model::Unit*>& enemies,
         const std::vector<model::Loot>& loot,
         const model::Zone& zone) const {
     std::vector<model::UnitOrder> orders;
-    std::vector<model::Obstacle> obstacles;
+    std::vector<const model::Obstacle*> obstacles;
 
     if (debugInterface) {
         myUnit.calcSpeedCircle(constants);
@@ -138,17 +138,17 @@ model::UnitOrder MyStrategy::getUnitOrder(
     for (auto &obstacle : constants.obstacles) {
         auto dist = myUnit.position.distTo(obstacle.position) - obstacle.radius;
         if(dist < constants.viewDistance) {
-            obstacles.emplace_back(obstacle);
+            obstacles.push_back(&obstacle);
         }
     }
 
-    std::optional<model::Unit> nearest_enemy;
+    model::Unit* nearest_enemy = nullptr;
     double min_dist_to_enemy = 1e9;
     for (auto &enemy : enemies) {
-        if (enemy.remainingSpawnTime.has_value()) {
+        if (enemy->remainingSpawnTime.has_value()) {
             continue;
         }
-        auto distToEnemy = enemy.position.distToSquared(myUnit.position);
+        auto distToEnemy = enemy->position.distToSquared(myUnit.position);
         if(distToEnemy < min_dist_to_enemy) {
             nearest_enemy = enemy;
             min_dist_to_enemy = distToEnemy;
@@ -175,7 +175,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
         }
 
         return model::UnitOrder(
-            (move_to - myUnit.position).mul(constants.zoneSpeed),
+            (move_to - myUnit.position).mul(constants.maxUnitForwardSpeed),
             (move_to - myUnit.position),
             std::nullopt
         );
@@ -187,19 +187,24 @@ model::UnitOrder MyStrategy::getUnitOrder(
             bool shooting = false;
             double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
-            model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, myUnit.playerId, myUnit.position + myUnit.direction * constants.unitRadius, myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed, constants.weapons[*myUnit.weapon].projectileLifeTime);
-            double dist_to_enemy = bullet.position.distTo(nearest_enemy->position) - constants.unitRadius;
+            auto bullet_position = myUnit.position + myUnit.direction * constants.unitRadius;
+            double dist_to_enemy = bullet_position.distTo(nearest_enemy->position) - constants.unitRadius;
             bool is_archer = nearest_enemy->weapon && constants.weapons[*nearest_enemy->weapon].name == "Bow";
             double dist_coef = is_archer ? 4 : 9;
-            if (fabs(1.0 - myUnit.aim) <= aim_delta) {
-
+            bool can_shoot = myUnit.nextShotTick - simulator.started_tick <= 15;
+            if (fabs(1.0 - myUnit.aim) <= aim_delta && can_shoot) {
                 double min_dist_to_obstacle = 1e9;
-                std::optional<model::Obstacle> nearest_obst;
+                model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, myUnit.playerId,
+                    bullet_position,
+                    myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed,
+                    constants.weapons[*myUnit.weapon].projectileLifeTime
+                );
+                const model::Obstacle* nearest_obst;
 
-                for (auto& obstacle: constants.obstacles) {
-                    if (obstacle.canShootThrough) continue;
-                    if (!bullet.intersectCircle(obstacle.position, obstacle.radius)) continue;
-                    double dist_to_obst = obstacle.position.distTo(bullet.position) - obstacle.radius;
+                for (auto& obstacle: obstacles) {
+                    if (obstacle->canShootThrough) continue;
+                    if (!bullet.intersectCircle(obstacle->position, obstacle->radius)) continue;
+                    double dist_to_obst = obstacle->position.distTo(bullet.position) - obstacle->radius;
                     if (dist_to_obst < min_dist_to_obstacle) {
                         nearest_obst = obstacle;
                         min_dist_to_obstacle = dist_to_obst;
@@ -216,11 +221,11 @@ model::UnitOrder MyStrategy::getUnitOrder(
             }
 
             for (size_t it = 0; it < 16; ++it) {
-                orders.push_back(model::UnitOrder(
+                orders.emplace_back(
                     move,
                     (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
-                    model::Aim(shooting)
-                ));
+                    can_shoot ? std::optional<model::ActionOrder>(model::Aim(shooting)) : std::nullopt
+                );
                 move.rotate(M_PI / 8);
             }
 
@@ -236,10 +241,10 @@ model::UnitOrder MyStrategy::getUnitOrder(
                 healing_order->targetVelocity = loot_order->targetVelocity;
             }
 
-            for (size_t it = 0; it < 8; ++it) {
-                orders.push_back(*healing_order);
-                healing_order->targetDirection.rotate(M_PI / 4);
-            }
+            orders.push_back(*healing_order);
+            // for (size_t it = 0; it < 8; ++it) {
+            //     healing_order->targetDirection.rotate(M_PI / 4);
+            // }
 
             continue;
         }
@@ -250,54 +255,53 @@ model::UnitOrder MyStrategy::getUnitOrder(
         }
 
         if (nearest_enemy && has_ammo && myUnit.health == constants.unitHealth && myUnit.shield > 0) {
-            orders.push_back(model::UnitOrder(
+            orders.emplace_back(
                 (nearest_enemy->position - myUnit.position).mul(constants.maxUnitForwardSpeed),
                 (nearest_enemy->position - myUnit.position),
                 std::nullopt
-            ));
+            );
             continue;
         }
 
-        orders.push_back(model::UnitOrder(
+        orders.emplace_back(
             (zone.nextCenter + default_dir * 0.9 * zone.nextRadius - myUnit.position),
-            {-myUnit.direction.y, myUnit.direction.x},
+            model::Vec2(-myUnit.direction.y, myUnit.direction.x),
             std::nullopt
-        ));
+        );
     }
 
     auto initial_velocaity = myUnit.velocity.isEmpty() ? default_dir : myUnit.velocity;
 
     auto vel = initial_velocaity;
-    for (size_t it1 = 0; it1 < 16; ++it1) {
+    for (size_t it1 = 0; it1 < 12; ++it1) {
         auto dir = myUnit.direction;
         for (size_t it2 = 0; it2 < 8; ++it2) {
-            orders.push_back(model::UnitOrder(
+            orders.emplace_back(
                 vel * constants.maxUnitForwardSpeed,
                 dir,
                 std::nullopt
-            ));
+            );
             dir.rotate(M_PI / 4);
         }
-        vel.rotate(M_PI / 8);
+        vel.rotate(M_PI / 6);
     }
 
     vel = initial_velocaity;
-    for (size_t it1 = 0; it1 < 16; ++it1) {
+    for (size_t it1 = 0; it1 < 12; ++it1) {
         auto dir = myUnit.direction;
         for (size_t it2 = 0; it2 < 8; ++it2) {
-            orders.push_back(model::UnitOrder(
+            orders.emplace_back(
                 vel * constants.maxUnitForwardSpeed,
                 dir,
                 model::Aim(false)
-            ));
+            );
             dir.rotate(M_PI / 4);
         }
-        vel.rotate(M_PI / 8);
+        vel.rotate(M_PI / 6);
     }
 
     int min_damage = 1e9;
     model::UnitOrder* best_order;
-    model::Vec2 vec;
 
     std::vector<model::Projectile> sim_bullets;
     for (const auto &b : bullets)

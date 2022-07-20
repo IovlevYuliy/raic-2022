@@ -18,8 +18,8 @@ public:
         model::Unit& unit,
         model::UnitOrder& order,
         std::vector<model::Projectile>& bullets,
-        const std::vector<model::Unit>& enemies,
-        const std::vector<model::Obstacle>& obstacles,
+        const std::vector<model::Unit*>& enemies,
+        const std::vector<const model::Obstacle*>& obstacles,
         const model::Zone& zone,
         int ticks) const;
 

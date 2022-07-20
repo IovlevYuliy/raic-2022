@@ -29,7 +29,7 @@ public:
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
 
     void simulateMovement(const model::Unit& myUnit, const std::vector<model::Projectile>& bullets) const;
-    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone) const;
+    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit*>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone) const;
 
     static model::Constants* getConstants();
 

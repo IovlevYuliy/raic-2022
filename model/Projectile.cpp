@@ -80,14 +80,17 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         auto v = velocity - unit.velocity;
         double a = v.x * v.x + v.y * v.y;
         double b = 2 * c0.x * v.x + 2 * c0.y * v.y;
-        double c = c0.x * c0.x + c0.y * c0.y - unit.unit_radius * unit.unit_radius;
+        double radius = (unit.unit_radius + 1e-3);
+        double c = c0.x * c0.x + c0.y * c0.y - radius * radius;
         double d = b * b - 4 * a * c;
 
         if (d < 0) {
             return std::nullopt;
         }
 
-        double t = (-b + sqrt(d)) / 2.0 / a;
+        double t1 = (-b + sqrt(d)) / 2.0 / a;
+        double t2 = (-b - sqrt(d)) / 2.0 / a;
+        double t = t1 < 0 ? t2 : (t2 < 0 ? t1 : std::min(t1, t2));
 
         if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
             return std::nullopt;
@@ -107,7 +110,9 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
             return std::nullopt;
         }
 
-        double t = (-b + sqrt(d)) / 2.0 / a;
+        double t1 = (-b + sqrt(d)) / 2.0 / a;
+        double t2 = (-b - sqrt(d)) / 2.0 / a;
+        double t = t1 < 0 ? t2 : (t2 < 0 ? t1 : std::min(t1, t2));
 
         if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond || t > lifeTime) {
             return std::nullopt;
