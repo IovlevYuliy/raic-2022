@@ -18,9 +18,7 @@ std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::ve
     auto cur_velocity = target_dir * cur_len;
 
     for (auto& bullet : bullets) {
-        // std::cerr << bullet.hasHit(unit, velocity) << std::endl;
         if (bullet.intersectUnit(unit, constants)) {
-            // std::cerr << "HAS HIT! +" << constants.weapons[bullet.weaponTypeIndex].projectileDamage << " damage\n";
             damage += constants.weapons[bullet.weaponTypeIndex].projectileDamage;
         }
     }

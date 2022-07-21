@@ -13,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 using std::cerr;
 using std::endl;
@@ -24,12 +25,14 @@ public:
     MyStrategy(const model::Constants& constants);
     model::Order getOrder(model::Game& game, DebugInterface* debugInterface);
 
-    std::optional<model::Vec2> dodging(std::vector<model::Projectile>& bullets, const model::Unit& myUnit);
-    std::optional<model::UnitOrder> looting(const std::vector<model::Loot>& loots, const model::Unit& myUnit, const model::Zone& zone) const;
+    std::optional<model::UnitOrder> looting(
+        const std::vector<model::Loot>& loots,
+        const std::vector<model::Unit*>& enemies,
+        const model::Unit& myUnit,
+        const model::Zone& zone);
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
 
-    void simulateMovement(const model::Unit& myUnit, const std::vector<model::Projectile>& bullets) const;
-    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit*>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone) const;
+    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit*>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone);
 
     static model::Constants* getConstants();
 
@@ -39,9 +42,10 @@ public:
     Simulator simulator;
     model::Constants constants;
     std::unordered_map<int, model::Projectile> bullets;
+    std::unordered_set<int> busy_loot;
     DebugInterface *debugInterface = nullptr;
     double delta_time;
-    double radius_treshold = 40.0;
+    double radius_treshold = 50.0;
     int elapsed_time = 0.0;
     model::Vec2 default_dir{1, 0};
 };
