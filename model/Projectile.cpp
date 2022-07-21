@@ -80,8 +80,7 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         auto v = velocity - unit.velocity;
         double a = v.x * v.x + v.y * v.y;
         double b = 2 * c0.x * v.x + 2 * c0.y * v.y;
-        double radius = (unit.unit_radius + 1e-3);
-        double c = c0.x * c0.x + c0.y * c0.y - radius * radius;
+        double c = c0.x * c0.x + c0.y * c0.y - unit.unit_radius_sq;
         double d = b * b - 4 * a * c;
 
         if (d < 0) {

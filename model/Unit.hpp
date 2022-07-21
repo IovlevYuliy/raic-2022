@@ -51,7 +51,7 @@ public:
     // Number of shield potions in inventory
     int shieldPotions;
 
-    int unit_radius = 0;
+    int unit_radius_sq = 0;
     int index = 0;
 
     double speed_radius = 0;

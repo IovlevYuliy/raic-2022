@@ -113,7 +113,7 @@ int Simulator::Simulate(
             break;
         }
     }
-    // std::cerr << has_collision << std::endl;
+
     if (!has_collision) {
         unit.next_position = unit.position + unit.velocity * delta_time;
     }

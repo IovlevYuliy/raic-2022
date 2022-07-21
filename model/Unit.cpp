@@ -165,7 +165,6 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
     }
 
     void Unit::calcSpeedCircle(const model::Constants& constants) {
-        unit_radius = constants.unitRadius;
         max_forward_speed = constants.maxUnitForwardSpeed;
         max_backward_speed = constants.maxUnitBackwardSpeed;
         if (weapon) {
@@ -191,12 +190,15 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
     };
 
     model::Vec2 Unit::getVelocity(const model::Vec2& dir) const {
-        double sin_a = std::clamp(direction.cross(dir), -1.0, 1.0);
+        double sin_a = direction.cross(dir);
+        double cos_a = direction.dot(dir);
+
         double d = (max_forward_speed - max_backward_speed) / 2;
         double sin_b = d * sin_a / speed_radius;
-        double angle = M_PI - asin(sin_a) - asin(sin_b);
+        double cos_b = sqrt(1 - sin_b * sin_b);
+        double cos_c = -cos_a * cos_b + sin_a * sin_b;
 
-        double len = sqrt(d * d + speed_radius * speed_radius - 2 * d * speed_radius * cos(angle));
+        double len = sqrt(d * d + speed_radius * speed_radius - 2 * d * speed_radius * cos_c);
         return dir * len;
     }
 

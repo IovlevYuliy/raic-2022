@@ -16,7 +16,7 @@ MyStrategy::MyStrategy(const model::Constants &consts) : constants(consts), simu
 
 model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterface) {
     auto t_start = std::chrono::system_clock::now();
-    default_dir.rotate(M_PI / 500);
+    default_dir.rotate(M_PI / 2000);
 
     simulator.started_tick = game.currentTick;
     debugInterface = dbgInterface;
@@ -46,6 +46,8 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
             continue;
         my_units.emplace_back(myUnit);
         myUnit.index = i;
+        myUnit.unit_radius_sq = constants.unitRadius * constants.unitRadius;
+
         if (debugInterface) {
             for (auto &[key, projectile] : bullets) {
                 if (projectile.intersectUnit(myUnit, constants)) {
@@ -332,7 +334,6 @@ model::UnitOrder MyStrategy::getUnitOrder(
         debugInterface->addPolyLine({myUnit.position, myUnit.position + best_order->targetDirection}, 0.1, debugging::Color(1, 0, 0, 1));
     }
 
-    // cerr << best_order->toString() << endl;
     return *best_order;
 }
 
