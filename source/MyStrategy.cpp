@@ -160,6 +160,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
     }
 
     bool has_ammo = myUnit.weapon && myUnit.ammo[*myUnit.weapon] > 0;
+    bool ready_attack = has_ammo && (myUnit.shield > 0 || myUnit.shieldPotions == 0);
     bool has_bow = myUnit.weapon && constants.weapons[*myUnit.weapon].name == "Bow";
     bool is_spawn = myUnit.remainingSpawnTime.has_value();
 
@@ -178,14 +179,13 @@ model::UnitOrder MyStrategy::getUnitOrder(
     }
 
     for (size_t ii = 0; ii < 1; ++ii) {
-        if (nearest_enemy && has_ammo && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 2 && ((has_bow && zone.currentRadius > radius_treshold) || zone.currentRadius < radius_treshold)) {
+        if (nearest_enemy && ready_attack && min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 2 && ((has_bow && zone.currentRadius > radius_treshold) || zone.currentRadius < radius_treshold)) {
             bool shooting = false;
             double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
             auto bullet_position = myUnit.position + myUnit.direction * constants.unitRadius;
             double dist_to_enemy = bullet_position.distTo(nearest_enemy->position) - constants.unitRadius;
             bool is_archer = nearest_enemy->weapon && constants.weapons[*nearest_enemy->weapon].name == "Bow";
-            double dist_coef = is_archer ? 4 : 9;
             bool can_shoot = myUnit.nextShotTick - simulator.started_tick <= 15;
             if (fabs(1.0 - myUnit.aim) <= aim_delta && can_shoot) {
                 double min_dist_to_obstacle = 1e9;
@@ -211,7 +211,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
 
             double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
             auto move = (nearest_enemy->position - myUnit.position).mul(constants.maxUnitForwardSpeed);
-            if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / dist_coef) {
+            if (min_dist_to_enemy < constants.viewDistance * constants.viewDistance / 9) {
                 move.rotate(M_PI_2);
             }
 
@@ -237,9 +237,6 @@ model::UnitOrder MyStrategy::getUnitOrder(
             }
 
             orders.push_back(*healing_order);
-            // for (size_t it = 0; it < 8; ++it) {
-            //     healing_order->targetDirection.rotate(M_PI / 4);
-            // }
 
             continue;
         }
@@ -332,7 +329,7 @@ model::UnitOrder MyStrategy::getUnitOrder(
 
 std::optional<model::UnitOrder> MyStrategy::healing(const model::Unit& myUnit) const {
     double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
-    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0 && myUnit.ammo[*myUnit.weapon] > 0 && !myUnit.action && myUnit.aim < aim_delta) {
+    if (constants.maxShield - myUnit.shield >= constants.shieldPerPotion && myUnit.shieldPotions > 0 && !myUnit.action && myUnit.aim < aim_delta) {
         return model::UnitOrder(
             myUnit.direction * constants.maxUnitForwardSpeed,
             {-myUnit.position.x, -myUnit.position.y},
@@ -406,7 +403,7 @@ std::optional<model::UnitOrder> MyStrategy::looting(
             if (!myUnit.weapon ||
                 (myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name == "Magic wand") ||
                 (constants.weapons[weapon.typeIndex].name == "Bow" && myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name != "Bow") ||
-                (zone.currentRadius < radius_treshold && myUnit.ammo[weapon.typeIndex] == 0)) {
+                (zone.currentRadius < radius_treshold && myUnit.ammo[*myUnit.weapon] == 0 && myUnit.ammo[weapon.typeIndex] > 0)) {
                 nearest_loot = loot;
                 min_dist = dist_to_loot;
             }
