@@ -227,6 +227,15 @@ model::UnitOrder MyStrategy::getUnitOrder(
             continue;
         }
 
+        if (nearest_enemy && myUnit.aim > 0.033 && myUnit.shield == 0 && myUnit.shieldPotions > 0) {
+            orders.emplace_back(
+                (myUnit.position - nearest_enemy->position).mul(constants.maxUnitForwardSpeed),
+                model::Vec2(-myUnit.position.x, -myUnit.position.y),
+                std::nullopt
+            );
+            continue;
+        }
+
         auto healing_order = healing(myUnit);
         auto loot_order = looting(loot, enemies, myUnit, zone);
 
