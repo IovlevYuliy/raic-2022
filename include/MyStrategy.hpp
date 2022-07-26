@@ -18,6 +18,8 @@
 using std::cerr;
 using std::endl;
 
+#define sqr(x) ((x)*(x))
+
 class MyStrategy {
 private:
     static model::Constants* constants_;
@@ -27,12 +29,20 @@ public:
 
     std::optional<model::UnitOrder> looting(
         const std::vector<model::Loot>& loots,
-        const std::vector<model::Unit*>& enemies,
         const model::Unit& myUnit,
         const model::Zone& zone);
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
 
-    model::UnitOrder getUnitOrder(model::Unit& myUnit, const std::vector<model::Unit*>& enemies, const std::vector<model::Loot>& loot, const model::Zone& zone);
+    void shooting(
+        const model::Unit& myUnit,
+        const model::Unit* nearest_enemy,
+        std::vector<const model::Obstacle*>& obstacles,
+        std::vector<model::UnitOrder>& orders) const;
+
+    model::UnitOrder getUnitOrder(
+        model::Unit& myUnit,
+        const std::vector<model::Loot>& loot,
+        const model::Zone& zone);
 
     static model::Constants* getConstants();
 
@@ -42,10 +52,13 @@ public:
     Simulator simulator;
     model::Constants constants;
     std::unordered_map<int, model::Projectile> bullets;
+    std::unordered_map<int, model::Unit> enemies;
     std::unordered_set<int> busy_loot;
+    std::vector<model::Unit*> my_units;
+
     DebugInterface *debugInterface = nullptr;
     double delta_time;
-    double radius_treshold = 50.0;
+    double radius_treshold = 100.0;
     int elapsed_time = 0.0;
     model::Vec2 default_dir{1, 0};
 };

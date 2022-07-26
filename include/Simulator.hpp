@@ -18,13 +18,13 @@ public:
         model::Unit& unit,
         model::UnitOrder& order,
         std::vector<model::Projectile>& bullets,
-        const std::vector<model::Unit*>& enemies,
         const std::vector<const model::Obstacle*>& obstacles,
         const model::Zone& zone,
         int ticks) const;
 
     model::Constants constants;
     int started_tick = 0;
+    double delta_time;
 };
 
 #endif

@@ -53,6 +53,7 @@ public:
 
     int unit_radius_sq = 0;
     int index = 0;
+    int ttl = 0;
 
     double speed_radius = 0;
     model::Vec2 speed_center;

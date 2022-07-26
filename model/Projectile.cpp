@@ -102,7 +102,7 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         auto c0 = position - obstacle.position;
         double a = velocity.x * velocity.x + velocity.y * velocity.y;
         double b = 2 * c0.x * velocity.x + 2 * c0.y * velocity.y;
-        double c = c0.x * c0.x + c0.y * c0.y - obstacle.radius * obstacle.radius;
+        double c = c0.x * c0.x + c0.y * c0.y - obstacle.radius_sq;
         double d = b * b - 4 * a * c;
 
         if (d < 0) {

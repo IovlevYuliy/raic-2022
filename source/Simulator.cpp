@@ -12,7 +12,6 @@ std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::ve
     }
 
     int damage = 0;
-    double delta_time = 1.0 / constants.ticksPerSecond;
     auto max_velocity = unit.getVelocity(target_dir).len();
     auto cur_len = unit.velocity.len();
     auto cur_velocity = target_dir * cur_len;
@@ -37,7 +36,6 @@ std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::ve
 int Simulator::Simulate(
         model::Unit& unit, model::UnitOrder& order,
         std::vector<model::Projectile>& bullets,
-        const std::vector<model::Unit*>& enemies,
         const std::vector<const model::Obstacle*>& obstacles,
         const model::Zone& zone,
         int cur_tick) const {
@@ -46,13 +44,12 @@ int Simulator::Simulate(
     }
 
     int damage = 0;
-    double delta_time = 1.0 / constants.ticksPerSecond;
 
     // SIMULATE UNIT AIM
     if (unit.weapon && order.action && std::holds_alternative<model::Aim>(*order.action)) {
-        unit.aim += (1.0 / constants.weapons[*unit.weapon].aimTime) * delta_time;
+        unit.aim += delta_time / constants.weapons[*unit.weapon].aimTime;
     } else {
-        unit.aim -= (1.0 / constants.weapons[*unit.weapon].aimTime) * delta_time;
+        unit.aim -= delta_time / constants.weapons[*unit.weapon].aimTime;
     }
     unit.aim = std::clamp(unit.aim, 0.0, 1.0);
 
@@ -66,7 +63,7 @@ int Simulator::Simulate(
     unit.direction.rotate(angle_shift);
 
     // SIMULATE UNIT SHOOTING
-    if (std::holds_alternative<model::Aim>(*order.action) && std::get<model::Aim>(*order.action).shoot && 1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick ) {
+    if (std::holds_alternative<model::Aim>(*order.action) && std::get<model::Aim>(*order.action).shoot && 1.0 - unit.aim < 1e-6 && unit.nextShotTick <= cur_tick) {
         // bool has_hit = false;
         // auto bullet_ray = model::Ray(unit.position, unit.direction);
         // for (auto& enemy : enemies) {
@@ -180,7 +177,7 @@ int Simulator::Simulate(
         damage += 2;
     }
 
-    damage += Simulate(unit, order, bullets, enemies, obstacles, zone, cur_tick + 1);
+    damage += Simulate(unit, order, bullets, obstacles, zone, cur_tick + 1);
 
     return damage;
 }

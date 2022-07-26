@@ -38,8 +38,8 @@ player_bace_TCP ={
     "host": None,
     "port": 31001,
     "accept_timeout": None,
-    "single_timeout": None,
-    "total_time_limit": None,
+    "single_timeout": 1,
+    "total_time_limit": 300,
     "token": None,
     "run": None
 }
@@ -47,7 +47,7 @@ player_bace_TCP ={
 config_bace = {
   "seed": None,
   "game": {
-    "Create": "Round2"
+    "Create": "Finals"
   },
   "players": []
 }
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     print(f'Running {numberIterations} matches')
 
     start_time = time.time()
-    with Pool(6) as p:
+    with Pool(3) as p:
         calculate_results(p.map(runProc, list(range(numberIterations))))
     time_prog = time.time()-start_time
     print(f"{numberIterations} matches. {int(time_prog//60)}:{int(time_prog%60)}")

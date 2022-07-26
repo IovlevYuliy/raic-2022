@@ -23,6 +23,8 @@ public:
     // Whether projectiles can go through this obstacle
     bool canShootThrough;
 
+    double radius_sq;
+
     Obstacle(int id, model::Vec2 position, double radius, bool canSeeThrough, bool canShootThrough);
 
     // Read Obstacle from input stream
