@@ -22,6 +22,8 @@ public:
     // Item
     model::Item item;
 
+    int ttl;
+
     Loot(int id, model::Vec2 position, model::Item item);
 
     // Read Loot from input stream

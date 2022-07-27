@@ -27,10 +27,7 @@ public:
     MyStrategy(const model::Constants& constants);
     model::Order getOrder(model::Game& game, DebugInterface* debugInterface);
 
-    std::optional<model::UnitOrder> looting(
-        const std::vector<model::Loot>& loots,
-        const model::Unit& myUnit,
-        const model::Zone& zone);
+    std::optional<model::UnitOrder> looting(const model::Unit& myUnit, const model::Zone& zone);
     std::optional<model::UnitOrder> healing(const model::Unit& myUnit) const;
 
     void shooting(
@@ -39,10 +36,7 @@ public:
         std::vector<const model::Obstacle*>& obstacles,
         std::vector<model::UnitOrder>& orders) const;
 
-    model::UnitOrder getUnitOrder(
-        model::Unit& myUnit,
-        const std::vector<model::Loot>& loot,
-        const model::Zone& zone);
+    model::UnitOrder getUnitOrder(model::Unit& myUnit, const model::Zone& zone);
 
     static model::Constants* getConstants();
 
@@ -53,7 +47,8 @@ public:
     model::Constants constants;
     std::unordered_map<int, model::Projectile> bullets;
     std::unordered_map<int, model::Unit> enemies;
-    std::unordered_set<int> busy_loot;
+    std::unordered_map<int, model::Loot> loots;
+    std::unordered_map<int, int> busy_loot;
     std::vector<model::Unit*> my_units;
 
     DebugInterface *debugInterface = nullptr;
