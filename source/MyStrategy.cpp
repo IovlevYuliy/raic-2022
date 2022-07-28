@@ -512,18 +512,21 @@ std::optional<model::UnitOrder> MyStrategy::looting(const model::Unit& myUnit, c
         return std::nullopt;
     }
 
+    auto dir = nearest_loot->position - myUnit.position;
+    dir.norm();
+
     busy_loot.insert({myUnit.id, nearest_loot->id});
     if (min_dist >= constants.unitRadius * constants.unitRadius) {
         return model::UnitOrder(
-            (nearest_loot->position - myUnit.position).mul(constants.maxUnitForwardSpeed),
-            myUnit.direction,
+            dir.mul(constants.maxUnitForwardSpeed),
+            dir,
             std::nullopt
         );
     }
 
     return model::UnitOrder(
         {0, 0},
-        myUnit.direction,
+        dir,
         model::Pickup(nearest_loot->id)
     );
 }
