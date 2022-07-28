@@ -6,31 +6,64 @@
 const int SIMULATED_TICKS = 30;
 Simulator::Simulator(const model::Constants &constants) : constants(constants) {}
 
-std::pair<model::Vec2, int> Simulator::Simulate(const model::Unit& unit, std::vector<model::Projectile>& bullets, model::Vec2& target_dir, int ticks) {
-    if (!ticks)  {
-        return {{0, 0}, 1000};
+std::optional<const model::Obstacle*> Simulator::SimulateMovement(model::Unit& unit, model::UnitOrder& order, const std::vector<const model::Obstacle*>& obstacles, int cur_tick) {
+    if (cur_tick - started_tick >= SIMULATED_TICKS)  {
+        return std::nullopt;
     }
 
     int damage = 0;
-    auto max_velocity = unit.getVelocity(target_dir).len();
-    auto cur_len = unit.velocity.len();
-    auto cur_velocity = target_dir * cur_len;
 
-    for (auto& bullet : bullets) {
-        if (bullet.intersectUnit(unit, constants)) {
-            damage += constants.weapons[bullet.weaponTypeIndex].projectileDamage;
+    // SIMULATE UNIT AIM
+    if (unit.weapon && order.action && std::holds_alternative<model::Aim>(*order.action)) {
+        unit.aim += delta_time / constants.weapons[*unit.weapon].aimTime;
+    } else {
+        unit.aim -= delta_time / constants.weapons[*unit.weapon].aimTime;
+    }
+    unit.aim = std::clamp(unit.aim, 0.0, 1.0);
+
+    // SIMULATE UNIT ROTATION
+    double diff_angle = atan2(order.targetDirection.cross(unit.direction), order.targetDirection.dot(unit.direction)) * 180 / M_PI;
+    double aim_rotation_speed = unit.weapon ? constants.weapons[*unit.weapon].aimRotationSpeed : 0;
+    double rotation_speed = constants.rotationSpeed - (constants.rotationSpeed - aim_rotation_speed) * unit.aim;
+    double sign = diff_angle > 0 ? -1 : 1;
+
+    double angle_shift = sign * std::min(fabs(diff_angle), rotation_speed * delta_time) * M_PI / 180;
+    unit.direction.rotate(angle_shift);
+
+    // SIMULATE UNIT MOVEMENT
+    unit.calcSpeedCircle(constants);
+    auto move_dir = order.targetVelocity.clone().norm();
+    auto max_velocity_len = unit.getVelocity(move_dir).len();
+    model::Vec2 target_velocity;
+    if (max_velocity_len >= order.targetVelocity.len()) {
+        target_velocity = order.targetVelocity;
+    } else {
+        target_velocity = move_dir.mul(max_velocity_len);
+    }
+
+    auto velocity_shift = (target_velocity - unit.velocity);
+    if (velocity_shift.len() > constants.unitAcceleration * delta_time) {
+        velocity_shift.norm().mul(constants.unitAcceleration * delta_time);
+    }
+    unit.velocity += velocity_shift;
+
+    const model::Obstacle* collision = nullptr;
+    for (auto& obstacle : obstacles) {
+        auto hit = unit.hasHit(*obstacle);
+
+        if (hit && *hit <= delta_time) {
+            collision = obstacle;
+            unit.position = unit.position + unit.velocity * (*hit);
+            break;
         }
     }
 
-    if (!damage) {
-        return { cur_velocity, damage };
+    if (!collision) {
+        unit.position = unit.position + unit.velocity * delta_time;
+        return SimulateMovement(unit, order, obstacles, cur_tick + 1);
+    } else {
+        return { collision };
     }
-
-    model::Unit sim_unit(unit);
-    sim_unit.position += cur_velocity * delta_time;
-    auto res = Simulate(sim_unit, bullets, target_dir, ticks - 1);
-
-    return { cur_velocity, std::min(damage, res.second) };
 }
 
 int Simulator::Simulate(
@@ -97,13 +130,13 @@ int Simulator::Simulate(
     for (auto& obstacle : obstacles) {
         auto hit = unit.hasHit(*obstacle);
 
-        if (hit) {
+        if (hit && *hit <= delta_time) {
             has_collision = true;
             double f1_time = *hit;
             double f2_time = delta_time - f1_time;
             unit.next_position = unit.position + unit.velocity * f1_time;
             auto v = (obstacle->position - unit.next_position).norm();
-            unit.velocity = model::Vec2(v.y, -v.x) * (v.cross(unit.velocity) / unit.velocity.len());
+            unit.velocity = model::Vec2(-v.y, v.x) * (v.cross(unit.velocity) / unit.velocity.len());
             unit.next_position += unit.velocity * f2_time;
             break;
         }

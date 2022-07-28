@@ -302,6 +302,19 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const model::Zone
         );
     }
 
+    for (auto& order: orders) {
+        auto sim_unit(myUnit);
+        auto collision = simulator.SimulateMovement(sim_unit, order, obstacles, simulator.started_tick);
+        if (collision) {
+            auto v = ((*collision)->position - sim_unit.position).norm();
+            auto shift = model::Vec2(-v.y, v.x) * v.cross(sim_unit.velocity);
+            shift.norm().mul((*collision)->radius);
+            order.targetVelocity = (sim_unit.position + shift - myUnit.position).mul(constants.maxUnitForwardSpeed);
+            // debugInterface->addPolyLine({sim_unit.position, sim_unit.position + shift}, 0.1, debugging::Color(0, 0, 1, 1));
+            // debugInterface->addRing(sim_unit.position, constants.unitRadius, 0.1, debugging::Color(0, 0, 1, 1));
+        }
+    }
+
     if (!bullets.empty()) {
         auto initial_velocaity = myUnit.velocity.isEmpty() ? default_dir : myUnit.velocity;
         auto vel = initial_velocaity;

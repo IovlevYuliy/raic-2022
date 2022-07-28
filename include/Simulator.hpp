@@ -12,7 +12,11 @@ class Simulator {
 public:
     Simulator(const model::Constants& constants);
 
-    std::pair<model::Vec2, int> Simulate(const model::Unit& unit, std::vector<model::Projectile>& bullets, model::Vec2& target_dir, int ticks);
+    std::optional<const model::Obstacle*> SimulateMovement(
+        model::Unit& unit,
+        model::UnitOrder& order,
+        const std::vector<const model::Obstacle*>& obstacles,
+        int cur_tick);
 
     int Simulate(
         model::Unit& unit,

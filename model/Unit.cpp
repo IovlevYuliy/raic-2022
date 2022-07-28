@@ -222,11 +222,10 @@ Unit::Unit(int id, int playerId, double health, double shield, int extraLives, m
         double t2 = (-b - sqrt(d)) / 2.0 / a;
         double t = t1 < 0 ? t2 : (t2 < 0 ? t1 : std::min(t1, t2));
 
-        if (t < 0 || t > 1.0 / MyStrategy::getConstants()->ticksPerSecond) {
+        if (t < 0) {
             return std::nullopt;
         }
 
         return t;
     }
-
 }
