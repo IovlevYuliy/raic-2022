@@ -120,4 +120,49 @@ Projectile::Projectile(int id, int weaponTypeIndex, int shooterId, int shooterPl
         return position + velocity * t;
     }
 
+    std::optional<model::Vec2> Projectile::getHit(const model::Unit& unit) const {
+        auto c0 = position - unit.position;
+        auto v = velocity - unit.velocity;
+        double a = v.x * v.x + v.y * v.y;
+        double b = 2 * c0.x * v.x + 2 * c0.y * v.y;
+        double c = c0.x * c0.x + c0.y * c0.y - unit.unit_radius_sq;
+        double d = b * b - 4 * a * c;
+
+        if (d < 0) {
+            return std::nullopt;
+        }
+
+        double t1 = (-b + sqrt(d)) / 2.0 / a;
+        double t2 = (-b - sqrt(d)) / 2.0 / a;
+        double t = t1 < 0 ? t2 : (t2 < 0 ? t1 : std::min(t1, t2));
+
+        if (t < 0 || t > lifeTime) {
+            return std::nullopt;
+        }
+
+        return position + velocity * t;
+    }
+
+    std::optional<model::Vec2> Projectile::getHit(const model::Obstacle& obstacle) const {
+        auto c0 = position - obstacle.position;
+        double a = velocity.x * velocity.x + velocity.y * velocity.y;
+        double b = 2 * c0.x * velocity.x + 2 * c0.y * velocity.y;
+        double c = c0.x * c0.x + c0.y * c0.y - obstacle.radius_sq;
+        double d = b * b - 4 * a * c;
+
+        if (d < 0) {
+            return std::nullopt;
+        }
+
+        double t1 = (-b + sqrt(d)) / 2.0 / a;
+        double t2 = (-b - sqrt(d)) / 2.0 / a;
+        double t = t1 < 0 ? t2 : (t2 < 0 ? t1 : std::min(t1, t2));
+
+        if (t < 0 || t > lifeTime) {
+            return std::nullopt;
+        }
+
+        return position + velocity * t;
+    }
+
 }

@@ -38,6 +38,7 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         if (unit.playerId != game.myId) {
             enemies.insert_or_assign(unit.id, unit);
             enemies.at(unit.id).ttl = UNIT_TTL;
+            enemies.at(unit.id).unit_radius_sq = constants.unitRadius * constants.unitRadius;
         }
     }
 
@@ -339,6 +340,8 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const model::Zone
     for (const auto &b : bullets) {
         if (b.second.position.distToSquared(myUnit.position) > sqr(b.second.lifeTime * constants.weapons[b.second.weaponTypeIndex].projectileSpeed))
             continue;
+        if (b.second.shooterId == myUnit.id) continue;
+
         sim_bullets.emplace_back(b.second);
     }
 
@@ -378,33 +381,43 @@ void MyStrategy::shooting(
     bool shooting = false;
     double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
-    auto bullet_position = myUnit.position + myUnit.direction * constants.unitRadius;
-    double dist_to_enemy = bullet_position.distTo(nearest_enemy->position) - constants.unitRadius;
-    bool is_archer = constants.weapons[*myUnit.weapon].name == "Bow";
-    double dist_coef = is_archer ? 9 : 18;
+     model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, myUnit.playerId,
+        myUnit.position + myUnit.direction * constants.unitRadius,
+        myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed,
+        constants.weapons[*myUnit.weapon].projectileLifeTime
+    );
+
+    double dist_to_enemy = bullet.position.distTo(nearest_enemy->position) - constants.unitRadius;
+    auto enemy_hit = bullet.getHit(*nearest_enemy);
+    if (enemy_hit) {
+        dist_to_enemy = bullet.position.distTo(*enemy_hit);
+    }
     bool can_shoot = myUnit.nextShotTick - simulator.started_tick <= 15;
-    if (fabs(1.0 - myUnit.aim) <= aim_delta && can_shoot) {
+
+    if (fabs(1.0 - myUnit.aim) <= aim_delta && can_shoot && enemy_hit) {
         double min_dist_to_obstacle = 1e9;
         double min_dist_to_ally = 1e9;
-        model::Projectile bullet(-1, *myUnit.weapon, myUnit.id, myUnit.playerId,
-            bullet_position,
-            myUnit.direction * constants.weapons[*myUnit.weapon].projectileSpeed,
-            constants.weapons[*myUnit.weapon].projectileLifeTime
-        );
 
         for (auto& obstacle: obstacles) {
             if (obstacle->canShootThrough) continue;
-            if (!bullet.intersectCircle(obstacle->position, obstacle->radius)) continue;
-            min_dist_to_obstacle = std::min(min_dist_to_obstacle, obstacle->position.distTo(bullet.position) - obstacle->radius);
+            auto hit = bullet.getHit(*obstacle);
+            if (hit) {
+                min_dist_to_obstacle = std::min(min_dist_to_obstacle, hit->distTo(bullet.position));
+            }
         }
 
         for (auto& unit: my_units) {
-            if (!bullet.intersectUnit(*unit, constants)) continue;
-            min_dist_to_ally = std::min(min_dist_to_ally, unit->position.distTo(bullet.position) - constants.unitRadius);
+            auto hit = bullet.getHit(*unit);
+            if (hit) {
+                min_dist_to_ally = std::min(min_dist_to_ally, hit->distTo(bullet.position));
+            }
         }
 
         shooting = (dist_to_enemy <= min_dist_to_obstacle && dist_to_enemy <= min_dist_to_ally);
     }
+
+    bool is_archer = constants.weapons[*myUnit.weapon].name == "Bow";
+    double dist_coef = is_archer ? 9 : 18;
 
     double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
     auto move = (nearest_enemy->position - myUnit.position).mul(constants.maxUnitForwardSpeed);
@@ -482,12 +495,12 @@ std::optional<model::UnitOrder> MyStrategy::looting(const model::Unit& myUnit, c
             min_dist = dist_to_loot;
         }
 
-        if (std::holds_alternative<model::Ammo>(loot.item)) {
+        if (std::holds_alternative<model::Ammo>(loot.item) && myUnit.weapon) {
             auto ammo = std::get<model::Ammo>(loot.item);
             if (constants.weapons[ammo.weaponTypeIndex].name == "Magic wand") continue;
             // if (constants.weapons[ammo.weaponTypeIndex].name == "Staff" && zone.currentRadius > radius_treshold) continue;
 
-            if (myUnit.ammo[ammo.weaponTypeIndex] < 0.9 * constants.weapons[ammo.weaponTypeIndex].maxInventoryAmmo) {
+            if (myUnit.ammo[ammo.weaponTypeIndex] < 0.9 * constants.weapons[ammo.weaponTypeIndex].maxInventoryAmmo && (ammo.weaponTypeIndex == *myUnit.weapon || myUnit.ammo[*myUnit.weapon] >= 5)) {
                 nearest_loot = &loot;
                 min_dist = dist_to_loot;
             }
@@ -496,12 +509,12 @@ std::optional<model::UnitOrder> MyStrategy::looting(const model::Unit& myUnit, c
         if (std::holds_alternative<model::Weapon>(loot.item)) {
             auto weapon = std::get<model::Weapon>(loot.item);
             if (constants.weapons[weapon.typeIndex].name == "Magic wand") continue;
-            if (constants.weapons[weapon.typeIndex].name == "Staff" && zone.currentRadius > radius_treshold) continue;
+            // if (constants.weapons[weapon.typeIndex].name == "Staff" && zone.currentRadius > radius_treshold) continue;
 
             if (!myUnit.weapon ||
                 (myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name == "Magic wand") ||
                 (constants.weapons[weapon.typeIndex].name == "Bow" && myUnit.ammo[weapon.typeIndex] > 0 && constants.weapons[*myUnit.weapon].name != "Bow") ||
-                (zone.currentRadius < radius_treshold && myUnit.ammo[*myUnit.weapon] == 0 && myUnit.ammo[weapon.typeIndex] > 0)) {
+                (myUnit.ammo[*myUnit.weapon] == 0 && myUnit.ammo[weapon.typeIndex] > 0)) {
                 nearest_loot = &loot;
                 min_dist = dist_to_loot;
             }

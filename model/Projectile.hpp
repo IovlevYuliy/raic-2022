@@ -48,6 +48,9 @@ public:
 
     std::optional<model::Vec2> hasHit(const model::Unit& unit) const;
     std::optional<model::Vec2> hasHit(const model::Obstacle& obstacle) const;
+
+    std::optional<model::Vec2> getHit(const model::Unit& unit) const;
+    std::optional<model::Vec2> getHit(const model::Obstacle& obstacle) const;
 };
 
 }
