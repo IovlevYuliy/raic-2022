@@ -42,6 +42,15 @@ model::Order MyStrategy::getOrder(model::Game &game, DebugInterface *dbgInterfac
         }
     }
 
+    for (auto &sound : game.sounds) {
+        if (constants.sounds[sound.typeIndex].name != "Steps") continue;
+        int fake_id = -(rand() % 1000000);
+        model::Unit fake_enemy(fake_id, -1, 100, 50, 0, sound.position, 0, {0, 0}, {0, 0}, 0, {}, 0, {}, 0, {}, 0);
+        enemies.insert_or_assign(fake_enemy.id, fake_enemy);
+        enemies.at(fake_id).ttl = UNIT_TTL - 2;
+        enemies.at(fake_id).unit_radius_sq = constants.unitRadius * constants.unitRadius;
+    }
+
     for (auto &projectile : game.projectiles) {
         bullets.insert_or_assign(projectile.id, projectile);
     }
