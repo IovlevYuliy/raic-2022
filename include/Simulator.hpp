@@ -18,6 +18,11 @@ public:
         const std::vector<const model::Obstacle*>& obstacles,
         int cur_tick);
 
+    void SimulateEnemyMovement(
+        model::Unit& unit,
+        std::vector<const model::Obstacle*>& obstacles,
+        int cur_tick);
+
     int Simulate(
         model::Unit& unit,
         model::UnitOrder& order,

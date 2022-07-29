@@ -302,10 +302,22 @@ model::UnitOrder MyStrategy::getUnitOrder(model::Unit& myUnit, const model::Zone
         );
     }
 
+    std::optional<model::Vec2> loot_pos;
+    if(busy_loot.count(myUnit.id)) {
+        int loot_id = busy_loot.at(myUnit.id);
+        for (auto& [id, loot]: loots) {
+            if (id == loot_id) {
+                loot_pos = loot.position;
+                break;
+            }
+        }
+    }
+
     for (auto& order: orders) {
         auto sim_unit(myUnit);
         auto collision = simulator.SimulateMovement(sim_unit, order, obstacles, simulator.started_tick);
         if (collision) {
+            if (loot_pos && loot_pos->distToSquared(sim_unit.position) <= constants.unitRadius) continue;
             auto v = ((*collision)->position - sim_unit.position).norm();
             auto shift = model::Vec2(-v.y, v.x) * v.cross(sim_unit.velocity);
             shift.norm().mul((*collision)->radius);
@@ -390,7 +402,7 @@ void MyStrategy::shooting(
         const model::Unit& myUnit,
         const model::Unit* nearest_enemy,
         std::vector<const model::Obstacle*>& obstacles,
-        std::vector<model::UnitOrder>& orders) const {
+        std::vector<model::UnitOrder>& orders) {
     bool shooting = false;
     double aim_delta = 1.0 / constants.weapons[*myUnit.weapon].aimTime / constants.ticksPerSecond;
 
@@ -405,6 +417,12 @@ void MyStrategy::shooting(
     if (enemy_hit) {
         dist_to_enemy = bullet.position.distTo(*enemy_hit);
     }
+
+    double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
+    int ticks_to_hit = std::ceil(time_to_hit * constants.ticksPerSecond);
+    auto sim_enemy(*nearest_enemy);
+    simulator.SimulateEnemyMovement(sim_enemy, obstacles, simulator.started_tick + 30 - ticks_to_hit);
+
     bool can_shoot = myUnit.nextShotTick - simulator.started_tick <= 15;
 
     if (fabs(1.0 - myUnit.aim) <= aim_delta && can_shoot && enemy_hit) {
@@ -432,7 +450,6 @@ void MyStrategy::shooting(
     bool is_archer = constants.weapons[*myUnit.weapon].name == "Bow";
     double dist_coef = is_archer ? 9 : 18;
 
-    double time_to_hit = dist_to_enemy / constants.weapons[*myUnit.weapon].projectileSpeed;
     auto move = (nearest_enemy->position - myUnit.position).mul(constants.maxUnitForwardSpeed);
     auto min_dist_to_enemy = nearest_enemy->position.distToSquared(myUnit.position);
     if (dist_coef * min_dist_to_enemy < constants.viewDistance * constants.viewDistance) {
@@ -442,7 +459,7 @@ void MyStrategy::shooting(
     for (size_t it = 0; it < 16; ++it) {
         orders.emplace_back(
             move,
-            (nearest_enemy->position + nearest_enemy->velocity * time_to_hit) - myUnit.position,
+            sim_enemy.position - myUnit.position,
             can_shoot ? std::optional<model::ActionOrder>(model::Aim(shooting)) : std::nullopt
         );
         move.rotate(M_PI / 8);
@@ -488,13 +505,12 @@ std::optional<model::UnitOrder> MyStrategy::looting(const model::Unit& myUnit, c
         double min_dist_to_me = loot.position.distToSquared(myUnit.position);
         double min_dist_to_enemy = 1e9;
         for (auto& [id, enemy] : enemies) {
-            if (enemy.remainingSpawnTime && enemy.ttl < UNIT_TTL - 2) continue;
             min_dist_to_enemy = std::min(
                 min_dist_to_enemy,
                 loot.position.distToSquared(enemy.position));
         }
 
-        if (9 * min_dist_to_enemy < constants.viewDistance * constants.viewDistance && 10 * min_dist_to_me > constants.viewDistance * constants.viewDistance) {
+        if (9 * min_dist_to_enemy < constants.viewDistance * constants.viewDistance && min_dist_to_me > 2) {
             continue;
         }
 

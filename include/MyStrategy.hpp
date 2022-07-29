@@ -34,7 +34,7 @@ public:
         const model::Unit& myUnit,
         const model::Unit* nearest_enemy,
         std::vector<const model::Obstacle*>& obstacles,
-        std::vector<model::UnitOrder>& orders) const;
+        std::vector<model::UnitOrder>& orders);
 
     model::UnitOrder getUnitOrder(model::Unit& myUnit, const model::Zone& zone);
 

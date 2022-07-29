@@ -66,6 +66,37 @@ std::optional<const model::Obstacle*> Simulator::SimulateMovement(model::Unit& u
     }
 }
 
+void Simulator::SimulateEnemyMovement(model::Unit& unit, std::vector<const model::Obstacle*>& obstacles, int cur_tick) {
+    if (cur_tick - started_tick >= SIMULATED_TICKS)  {
+        return;
+    }
+
+    int damage = 0;
+
+    bool has_collision = false;
+    for (auto& obstacle : obstacles) {
+        auto hit = unit.hasHit(*obstacle);
+
+        if (hit && *hit <= delta_time) {
+            has_collision = true;
+            double f1_time = *hit;
+            double f2_time = delta_time - f1_time;
+            unit.next_position = unit.position + unit.velocity * f1_time;
+            auto v = (obstacle->position - unit.next_position).norm();
+            unit.velocity = model::Vec2(-v.y, v.x) * (v.cross(unit.velocity) / unit.velocity.len());
+            unit.next_position += unit.velocity * f2_time;
+            break;
+        }
+    }
+
+    if (!has_collision) {
+        unit.next_position = unit.position + unit.velocity * delta_time;
+    }
+
+    unit.position = unit.next_position;
+    return SimulateEnemyMovement(unit, obstacles, cur_tick + 1);
+}
+
 int Simulator::Simulate(
         model::Unit& unit, model::UnitOrder& order,
         std::vector<model::Projectile>& bullets,
